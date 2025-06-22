@@ -2,26 +2,89 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>TV Garden con lista IPTV</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TV Garden - Todos los países y categorías IPTV</title>
   <link href="https://cdn.jsdelivr.net/npm/video.js@8.9.0/dist/video-js.min.css" rel="stylesheet"/>
   <style>
-    body { margin:0; font-family:Arial,sans-serif; background:#000; color:#fff; display:flex; height:100vh; }
-    aside { width:300px; background:#111; padding:10px; overflow-y:auto; }
-    .chan { padding:8px; margin-bottom:5px; background:#222; border-radius:4px; cursor:pointer; }
-    .chan:hover { background:#333; }
-    main { flex:1; display:flex; align-items:center; justify-content:center; padding:10px; }
-    .vid { width:100%; max-width:960px; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #000;
+      color: #fff;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    nav, aside, main {
+      padding: 10px;
+      overflow-y: auto;
+    }
+    nav {
+      width: 250px;
+      background: #111;
+      border-right: 1px solid #333;
+    }
+    aside {
+      width: 250px;
+      background: #222;
+      border-right: 1px solid #333;
+    }
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding-top: 20px;
+    }
+    h2 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 1.2rem;
+      border-bottom: 1px solid #444;
+      padding-bottom: 5px;
+    }
+    .item {
+      padding: 8px;
+      margin-bottom: 5px;
+      background: #333;
+      border-radius: 4px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .item:hover {
+      background: #555;
+    }
+    .selected {
+      background: #0080ff !important;
+    }
+    .video-container {
+      width: 90%;
+      max-width: 960px;
+      margin-bottom: 20px;
+    }
   </style>
 </head>
 <body>
+  <nav>
+    <h2>Países</h2>
+    <div id="countryList">Cargando países...</div>
+  </nav>
   <aside>
-    <h2>Canales</h2>
-    <div id="channels">Cargando canales…</div>
+    <h2>Categorías</h2>
+    <div id="categoryList">Selecciona un país</div>
   </aside>
   <main>
-    <div class="vid">
-      <video id="tv" class="video-js vjs-default-skin" controls autoplay preload="auto" width="960" height="540">
+    <div class="video-container">
+      <video
+        id="tv"
+        class="video-js vjs-default-skin"
+        controls
+        autoplay
+        preload="auto"
+        width="960"
+        height="540"
+      >
         Tu navegador no soporta video.
       </video>
     </div>
@@ -29,40 +92,286 @@
 
   <script src="https://cdn.jsdelivr.net/npm/video.js@8.9.0/dist/video.min.js"></script>
   <script>
-    const m3uUrl = 'https://iptv-org.github.io/iptv/index.m3u';
     const player = videojs('tv');
-    async function loadM3U() {
-      const res = await fetch(m3uUrl);
-      const text = await res.text();
+    const countryListEl = document.getElementById('countryList');
+    const categoryListEl = document.getElementById('categoryList');
+    let channels = [];
+    let selectedCountry = null;
+    let selectedCategory = null;
+
+    // Lista de países con nombre y código (códigos basados en IPTV-org)
+    const countries = [
+      { code: 'ad', name: 'Andorra' },
+      { code: 'ae', name: 'Emiratos Árabes Unidos' },
+      { code: 'af', name: 'Afganistán' },
+      { code: 'ag', name: 'Antigua y Barbuda' },
+      { code: 'ai', name: 'Anguila' },
+      { code: 'al', name: 'Albania' },
+      { code: 'am', name: 'Armenia' },
+      { code: 'ao', name: 'Angola' },
+      { code: 'ar', name: 'Argentina' },
+      { code: 'at', name: 'Austria' },
+      { code: 'au', name: 'Australia' },
+      { code: 'aw', name: 'Aruba' },
+      { code: 'az', name: 'Azerbaiyán' },
+      { code: 'ba', name: 'Bosnia y Herzegovina' },
+      { code: 'bb', name: 'Barbados' },
+      { code: 'bd', name: 'Bangladesh' },
+      { code: 'be', name: 'Bélgica' },
+      { code: 'bf', name: 'Burkina Faso' },
+      { code: 'bg', name: 'Bulgaria' },
+      { code: 'bh', name: 'Bahrein' },
+      { code: 'bi', name: 'Burundi' },
+      { code: 'bj', name: 'Benín' },
+      { code: 'bm', name: 'Bermudas' },
+      { code: 'bn', name: 'Brunéi' },
+      { code: 'bo', name: 'Bolivia' },
+      { code: 'br', name: 'Brasil' },
+      { code: 'bs', name: 'Bahamas' },
+      { code: 'bt', name: 'Bután' },
+      { code: 'bw', name: 'Botsuana' },
+      { code: 'by', name: 'Bielorrusia' },
+      { code: 'bz', name: 'Belice' },
+      { code: 'ca', name: 'Canadá' },
+      { code: 'cd', name: 'República Democrática del Congo' },
+      { code: 'cf', name: 'República Centroafricana' },
+      { code: 'cg', name: 'Congo' },
+      { code: 'ch', name: 'Suiza' },
+      { code: 'ci', name: 'Costa de Marfil' },
+      { code: 'cl', name: 'Chile' },
+      { code: 'cm', name: 'Camerún' },
+      { code: 'cn', name: 'China' },
+      { code: 'co', name: 'Colombia' },
+      { code: 'cr', name: 'Costa Rica' },
+      { code: 'cu', name: 'Cuba' },
+      { code: 'cv', name: 'Cabo Verde' },
+      { code: 'cy', name: 'Chipre' },
+      { code: 'cz', name: 'República Checa' },
+      { code: 'de', name: 'Alemania' },
+      { code: 'dj', name: 'Yibuti' },
+      { code: 'dk', name: 'Dinamarca' },
+      { code: 'dm', name: 'Dominica' },
+      { code: 'do', name: 'República Dominicana' },
+      { code: 'dz', name: 'Argelia' },
+      { code: 'ec', name: 'Ecuador' },
+      { code: 'ee', name: 'Estonia' },
+      { code: 'eg', name: 'Egipto' },
+      { code: 'es', name: 'España' },
+      { code: 'et', name: 'Etiopía' },
+      { code: 'fi', name: 'Finlandia' },
+      { code: 'fj', name: 'Fiyi' },
+      { code: 'fm', name: 'Micronesia' },
+      { code: 'fr', name: 'Francia' },
+      { code: 'ga', name: 'Gabón' },
+      { code: 'gb', name: 'Reino Unido' },
+      { code: 'gd', name: 'Granada' },
+      { code: 'ge', name: 'Georgia' },
+      { code: 'gh', name: 'Ghana' },
+      { code: 'gm', name: 'Gambia' },
+      { code: 'gn', name: 'Guinea' },
+      { code: 'gq', name: 'Guinea Ecuatorial' },
+      { code: 'gr', name: 'Grecia' },
+      { code: 'gt', name: 'Guatemala' },
+      { code: 'gw', name: 'Guinea-Bisáu' },
+      { code: 'gy', name: 'Guyana' },
+      { code: 'hn', name: 'Honduras' },
+      { code: 'hr', name: 'Croacia' },
+      { code: 'ht', name: 'Haití' },
+      { code: 'hu', name: 'Hungría' },
+      { code: 'id', name: 'Indonesia' },
+      { code: 'ie', name: 'Irlanda' },
+      { code: 'il', name: 'Israel' },
+      { code: 'in', name: 'India' },
+      { code: 'iq', name: 'Irak' },
+      { code: 'ir', name: 'Irán' },
+      { code: 'is', name: 'Islandia' },
+      { code: 'it', name: 'Italia' },
+      { code: 'jm', name: 'Jamaica' },
+      { code: 'jo', name: 'Jordania' },
+      { code: 'jp', name: 'Japón' },
+      { code: 'ke', name: 'Kenia' },
+      { code: 'kg', name: 'Kirguistán' },
+      { code: 'kh', name: 'Camboya' },
+      { code: 'ki', name: 'Kiribati' },
+      { code: 'km', name: 'Comoras' },
+      { code: 'kn', name: 'San Cristóbal y Nieves' },
+      { code: 'kp', name: 'Corea del Norte' },
+      { code: 'kr', name: 'Corea del Sur' },
+      { code: 'kw', name: 'Kuwait' },
+      { code: 'ky', name: 'Islas Caimán' },
+      { code: 'kz', name: 'Kazajistán' },
+      { code: 'la', name: 'Laos' },
+      { code: 'lb', name: 'Líbano' },
+      { code: 'lc', name: 'Santa Lucía' },
+      { code: 'li', name: 'Liechtenstein' },
+      { code: 'lk', name: 'Sri Lanka' },
+      { code: 'lr', name: 'Liberia' },
+      { code: 'ls', name: 'Lesoto' },
+      { code: 'lt', name: 'Lituania' },
+      { code: 'lu', name: 'Luxemburgo' },
+      { code: 'lv', name: 'Letonia' },
+      { code: 'ly', name: 'Libia' },
+      { code: 'ma', name: 'Marruecos' },
+      { code: 'mc', name: 'Mónaco' },
+      { code: 'md', name: 'Moldavia' },
+      { code: 'me', name: 'Montenegro' },
+      { code: 'mg', name: 'Madagascar' },
+      { code: 'mk', name: 'Macedonia del Norte' },
+      { code: 'ml', name: 'Malí' },
+      { code: 'mm', name: 'Myanmar' },
+      { code: 'mn', name: 'Mongolia' },
+      { code: 'mr', name: 'Mauritania' },
+      { code: 'mt', name: 'Malta' },
+      { code: 'mu', name: 'Mauricio' },
+      { code: 'mv', name: 'Maldivas' },
+      { code: 'mw', name: 'Malawi' },
+      { code: 'mx', name: 'México' },
+      { code: 'my', name: 'Malasia' },
+      { code: 'mz', name: 'Mozambique' },
+      { code: 'na', name: 'Namibia' },
+      { code: 'nc', name: 'Nueva Caledonia' },
+      { code: 'ne', name: 'Níger' },
+      { code: 'ng', name: 'Nigeria' },
+      { code: 'ni', name: 'Nicaragua' },
+      { code: 'nl', name: 'Países Bajos' },
+      { code: 'no', name: 'Noruega' },
+      { code: 'np', name: 'Nepal' },
+      { code: 'nz', name: 'Nueva Zelanda' },
+      { code: 'om', name: 'Omán' },
+      { code: 'pa', name: 'Panamá' },
+      { code: 'pe', name: 'Perú' },
+      { code: 'pg', name: 'Papúa Nueva Guinea' },
+      { code: 'ph', name: 'Filipinas' },
+      { code: 'pk', name: 'Pakistán' },
+      { code: 'pl', name: 'Polonia' },
+      { code: 'pt', name: 'Portugal' },
+      { code: 'py', name: 'Paraguay' },
+      { code: 'qa', name: 'Qatar' },
+      { code: 'ro', name: 'Rumania' },
+      { code: 'rs', name: 'Serbia' },
+      { code: 'ru', name: 'Rusia' },
+      { code: 'rw', name: 'Ruanda' },
+      { code: 'sa', name: 'Arabia Saudita' },
+      { code: 'sb', name: 'Islas Salomón' },
+      { code: 'sc', name: 'Seychelles' },
+      { code: 'sd', name: 'Sudán' },
+      { code: 'se', name: 'Suecia' },
+      { code: 'sg', name: 'Singapur' },
+      { code: 'si', name: 'Eslovenia' },
+      { code: 'sk', name: 'Eslovaquia' },
+      { code: 'sl', name: 'Sierra Leona' },
+      { code: 'sn', name: 'Senegal' },
+      { code: 'so', name: 'Somalia' },
+      { code: 'sr', name: 'Surinam' },
+      { code: 'st', name: 'Santo Tomé y Príncipe' },
+      { code: 'sv', name: 'El Salvador' },
+      { code: 'sy', name: 'Siria' },
+      { code: 'sz', name: 'Suazilandia' },
+      { code: 'td', name: 'Chad' },
+      { code: 'tg', name: 'Togo' },
+      { code: 'th', name: 'Tailandia' },
+      { code: 'tj', name: 'Tayikistán' },
+      { code: 'tl', name: 'Timor Oriental' },
+      { code: 'tm', name: 'Turkmenistán' },
+      { code: 'tn', name: 'Túnez' },
+      { code: 'to', name: 'Tonga' },
+      { code: 'tr', name: 'Turquía' },
+      { code: 'tt', name: 'Trinidad y Tobago' },
+      { code: 'tv', name: 'Tuvalu' },
+      { code: 'tz', name: 'Tanzania' },
+      { code: 'ua', name: 'Ucrania' },
+      { code: 'ug', name: 'Uganda' },
+      { code: 'us', name: 'Estados Unidos' },
+      { code: 'uy', name: 'Uruguay' },
+      { code: 'uz', name: 'Uzbekistán' },
+      { code: 'vc', name: 'San Vicente y las Granadinas' },
+      { code: 've', name: 'Venezuela' },
+      { code: 'vn', name: 'Vietnam' },
+      { code: 'vu', name: 'Vanuatu' },
+      { code: 'ws', name: 'Samoa' },
+      { code: 'ye', name: 'Yemen' },
+      { code: 'za', name: 'Sudáfrica' },
+      { code: 'zm', name: 'Zambia' },
+      { code: 'zw', name: 'Zimbabue' }
+    ];
+
+    function createList(items, container, clickHandler) {
+      container.innerHTML = '';
+      items.forEach(item => {
+        const div = document.createElement('div');
+        div.textContent = item.name || item;
+        div.className = 'item';
+        div.onclick = () => clickHandler(item);
+        container.appendChild(div);
+      });
+    }
+
+    // Carga la lista de países inicialmente
+    createList(countries, countryListEl, async country => {
+      selectedCountry = country;
+      selectedCategory = null;
+      categoryListEl.innerHTML = 'Cargando categorías...';
+      // Marca selección visual
+      Array.from(countryListEl.children).forEach(c => c.classList.remove('selected'));
+      event.target.classList.add('selected');
+
+      // Descarga y parsea el archivo .m3u del país seleccionado
+      try {
+        const res = await fetch(`https://iptv-org.github.io/iptv/countries/${country.code}.m3u`);
+        const text = await res.text();
+        channels = parseM3U(text);
+        // Obtiene categorías únicas
+        const categories = Array.from(new Set(channels.map(c => c.group || 'Sin categoría'))).sort();
+        createList(categories, categoryListEl, category => {
+          selectedCategory = category;
+          // Marca selección visual
+          Array.from(categoryListEl.children).forEach(c => c.classList.remove('selected'));
+          event.target.classList.add('selected');
+          showChannels(category);
+        });
+      } catch (e) {
+        categoryListEl.innerHTML = 'Error cargando categorías';
+        console.error(e);
+      }
+    });
+
+    function parseM3U(text) {
       const lines = text.split(/\r?\n/);
-      const channels = [];
+      const result = [];
       for (let i = 0; i < lines.length; i++) {
         if (lines[i].startsWith('#EXTINF')) {
-          const info = lines[i];
-          const url = lines[++i];
-          const name = info.split(',')[1] || 'Sin nombre';
-          channels.push({ name, url });
+          const infoLine = lines[i];
+          const url = lines[i + 1];
+          // extraer nombre
+          const name = infoLine.split(',')[1] || 'Sin nombre';
+          // extraer grupo (category) si existe
+          let group = 'Sin categoría';
+          const matchGroup = infoLine.match(/group-title="([^"]+)"/i);
+          if (matchGroup) {
+            group = matchGroup[1];
+          }
+          result.push({ name, url, group });
+          i++;
         }
       }
-      const container = document.getElementById('channels');
-      container.innerHTML = '';
-      channels.forEach(ch => {
+      return result;
+    }
+
+    function showChannels(category) {
+      main.innerHTML = '<h2>Canales: ' + category + '</h2>';
+      const cont = document.createElement('div');
+      channels.filter(c => c.group === category).forEach(ch => {
         const el = document.createElement('div');
         el.textContent = ch.name;
-        el.className = 'chan';
+        el.className = 'item';
         el.onclick = () => {
           player.src({ type: 'application/x-mpegURL', src: ch.url });
           player.play();
         };
-        container.appendChild(el);
+        cont.appendChild(el);
       });
-      // Cargar el primer canal por defecto
-      if (channels.length > 0) {
-        player.src({ type: 'application/x-mpegURL', src: channels[0].url });
-        player.play();
-      }
+      main.appendChild(cont);
     }
-    loadM3U();
   </script>
 </body>
 </html>
