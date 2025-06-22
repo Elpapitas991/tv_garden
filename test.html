@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TV Mundial Interactivo</title>
+  <link href="https://cdn.jsdelivr.net/npm/video.js@8.9.0/dist/video-js.min.css" rel="stylesheet" />
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #000;
+      color: #fff;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #map-container {
+      flex: 1;
+      background: #111;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    svg {
+      max-width: 90%;
+      height: auto;
+      cursor: pointer;
+    }
+    #sidebar {
+      width: 350px;
+      background: #222;
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+      overflow-y: auto;
+      border-left: 1px solid #333;
+    }
+    #sidebar h2 {
+      margin: 0 0 10px 0;
+      font-size: 1.3rem;
+      border-bottom: 1px solid #444;
+      padding-bottom: 5px;
+    }
+    #channelSearch {
+      padding: 8px;
+      border-radius: 5px;
+      border: none;
+      font-size: 1rem;
+      outline: none;
+      margin-bottom: 10px;
+      width: 100%;
+      box-sizing: border-box;
+      color: #000;
+    }
+    #channelsList {
+      flex: 1;
+      overflow-y: auto;
+    }
+    .channel {
+      padding: 6px 8px;
+      cursor: pointer;
+      border-radius: 4px;
+      margin: 3px 0;
+      background: #333;
+    }
+    .channel:hover {
+      background: #555;
+    }
+    .selected {
+      background: #0080ff !important;
+      color: #fff;
+    }
+    .loading {
+      color: #888;
+      font-style: italic;
+      padding: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="map-container">
+    <!-- Mapa SVG muy simplificado: solo algunos países con sus códigos ISO -->
+    <svg viewBox="0 0 800 450" xmlns="http://www.w3.org/2000/svg" aria-label="Mapa mundial interactivo" role="img">
+      <title>Mapa mundial</title>
+      <!-- Aquí agrego algunos países clave para demo -->
+      <path id="us" title="Estados Unidos" fill="#0077be" d="M150 150 L180 150 L180 180 L150 180 Z" />
+      <path id="mx" title="México" fill="#ff9933" d="M150 190 L180 190 L180 220 L150 220 Z" />
+      <path id="ca" title="Canadá" fill="#d52b1e" d="M150 110 L180 110 L180 140 L150 140 Z" />
+      <path id="es" title="España" fill="#f1bf00" d="M600 180 L630 180 L630 210 L600 210 Z" />
+      <path id="fr" title="Francia" fill="#0055a4" d="M630 170 L660 170 L660 200 L630 200 Z" />
+      <path id="de" title="Alemania" fill="#000000" d="M660 150 L690 150 L690 180 L660 180 Z" />
+      <path id="ar" title="Argentina" fill="#74acdf" d="M300 350 L330 350 L330 380 L300 380 Z" />
+      <path id="br" title="Brasil" fill="#009b3a" d="M340 310 L370 310 L370 340 L340 340 Z" />
+      <path id="au" title="Australia" fill="#ffcc00" d="M700 380 L730 380 L730 410 L700 410 Z" />
+    </svg>
+  </div>
+
+  <div id="sidebar">
+    <h2 id="countryTitle">Selecciona un país</h2>
+    <input type="text" id="channelSearch" placeholder="Buscar canales cargados..." disabled />
+    <div id="channelsList"><em>Los canales aparecerán aquí al seleccionar un país.</em></div>
+    <video-js id="tv" class="video-js vjs-default-skin" controls autoplay preload="auto" width="320" height="180">
+      <source src="" type="application/x-mpegURL" />
+      Tu navegador no soporta video.
+    </video-js>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/video.js@8.9.0/dist/video.min.js"></script>
+  <script>
+    const player = videojs('tv');
+    const countriesMap = {
+      us: { code: 'us', name: 'Estados Unidos' },
+      mx: { code: 'mx', name: 'México' },
+      ca: { code: 'ca', name: 'Canadá' },
+      es: { code: 'es', name: 'España' },
+      fr: { code: 'fr', name: 'Francia' },
+      de: { code: 'de', name: 'Alemania' },
+      ar: { code: 'ar', name: 'Argentina' },
+      br: { code: 'br', name: 'Brasil' },
+      au: { code: 'au', name: 'Australia' },
+    };
+
+    const channelSearchEl = document.getElementById('channelSearch');
+    const channelsListEl = document.getElementById('channelsList');
+    const countryTitleEl = document.getElementById('countryTitle');
+
+    let loadedChannelsByCountry = {}; // canales cargados { countryCode: [channels] }
+    let currentCountryCode = null;
+    let filteredChannels = [];
+
+    function parseM3U(text) {
+      const lines = text.split(/\r?\n/);
+      const result = [];
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].startsWith('#EXTINF')) {
+          let name = lines[i].split(',')[1] || 'Sin nombre';
+          const idx = name.indexOf(' group-title=');
+          if (idx !== -1) name = name.substring(0, idx).trim();
+          const url = lines[i + 1];
+          result.push({ name, url });
+          i++;
+        }
+      }
+      return result;
+    }
+
+    function showChannels(channels) {
+      channelsListEl.innerHTML = '';
+      if (channels.length === 0) {
+        channelsListEl.innerHTML = '<em>No hay canales para mostrar.</em>';
+        return;
+      }
+      channels.forEach(ch => {
+        const chDiv = document.createElement('div');
+        chDiv.className = 'channel';
+        chDiv.textContent = ch.name;
+        chDiv.title = ch.name;
+        chDiv.onclick = () => {
+          player.src({ type: 'application/x-mpegURL', src: ch.url });
+          player.play();
+          clearSelection();
+          chDiv.classList.add('selected');
+          countryTitleEl.textContent = `Reproduciendo: ${ch.name} (${currentCountryCode.toUpperCase()})`;
+        };
+        channelsListEl.appendChild(chDiv);
+      });
+    }
+
+    function clearSelection() {
+      document.querySelectorAll('.channel.selected').forEach(el => el.classList.remove('selected'));
+    }
+
+    async function loadCountryChannels(countryCode) {
+      if (loadedChannelsByCountry[countryCode]) {
+        return loadedChannelsByCountry[countryCode];
+      }
+      channelsListEl.innerHTML = '<div class="loading">Cargando canales...</div>';
+      try {
+        const res = await fetch(`https://iptv-org.github.io/iptv/countries/${countryCode}.m3u`);
+        if (!res.ok) throw new Error('No se pudo cargar el archivo');
+        const text = await res.text();
+        const channels = parseM3U(text);
+        loadedChannelsByCountry[countryCode] = channels;
+        return channels;
+      } catch (e) {
+        channelsListEl.innerHTML = '<em>Error cargando canales.</em>';
+        console.error(e);
+        return [];
+      }
+    }
+
+    async function selectCountry(countryCode) {
+      currentCountryCode = countryCode;
+      countryTitleEl.textContent = `Canales de ${countriesMap[countryCode].name}`;
+      channelSearchEl.value = '';
+      channelSearchEl.disabled = false;
+      const channels = await loadCountryChannels(countryCode);
+      filteredChannels = channels;
+      showChannels(channels);
+    }
+
+    // Evento clic en mapa
+    document.querySelectorAll('svg path').forEach(path => {
+      path.addEventListener('click', () => {
+        const code = path.id;
+        if (countriesMap[code]) {
+          selectCountry(code);
+        }
+      });
+    });
+
+    // Búsqueda local entre canales ya cargados del país actual
+    channelSearchEl.addEventListener('input', () => {
+      const search = channelSearchEl.value.trim().toLowerCase();
+      if (!currentCountryCode) return;
+      if (!search) {
+        filteredChannels = loadedChannelsByCountry[currentCountryCode] || [];
+        showChannels(filteredChannels);
+        return;
+      }
+      const filtered = (loadedChannelsByCountry[currentCountryCode] || []).filter(ch =>
+        ch.name.toLowerCase().includes(search)
+      );
+      filteredChannels = filtered;
+      showChannels(filteredChannels);
+    });
+
+    // Inicializamos el reproductor
+    player.play();
+
+  </script>
+</body>
+</html>
