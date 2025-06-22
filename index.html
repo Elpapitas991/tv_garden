@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>TV Garden - Todos los países y categorías IPTV</title>
+  <title>TV Garden Simplificado - Canales por País</title>
   <link href="https://cdn.jsdelivr.net/npm/video.js@8.9.0/dist/video-js.min.css" rel="stylesheet"/>
   <style>
     body {
@@ -15,18 +15,13 @@
       height: 100vh;
       overflow: hidden;
     }
-    nav, aside, main {
+    nav, main {
       padding: 10px;
       overflow-y: auto;
     }
     nav {
-      width: 250px;
+      width: 300px;
       background: #111;
-      border-right: 1px solid #333;
-    }
-    aside {
-      width: 250px;
-      background: #222;
       border-right: 1px solid #333;
     }
     main {
@@ -34,7 +29,6 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: flex-start;
       padding-top: 20px;
     }
     h2 {
@@ -63,6 +57,15 @@
       max-width: 960px;
       margin-bottom: 20px;
     }
+    .channel-list {
+      width: 90%;
+      max-width: 960px;
+      max-height: calc(100vh - 600px);
+      overflow-y: auto;
+      background: #111;
+      border-radius: 5px;
+      padding: 5px;
+    }
   </style>
 </head>
 <body>
@@ -70,10 +73,6 @@
     <h2>Países</h2>
     <div id="countryList">Cargando países...</div>
   </nav>
-  <aside>
-    <h2>Categorías</h2>
-    <div id="categoryList">Selecciona un país</div>
-  </aside>
   <main>
     <div class="video-container">
       <video
@@ -88,18 +87,17 @@
         Tu navegador no soporta video.
       </video>
     </div>
+    <h2 id="channelTitle">Selecciona un país para ver sus canales</h2>
+    <div id="channelList" class="channel-list"></div>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/video.js@8.9.0/dist/video.min.js"></script>
   <script>
-    const player = videojs('tv');
+    let player = videojs('tv');
     const countryListEl = document.getElementById('countryList');
-    const categoryListEl = document.getElementById('categoryList');
-    let channels = [];
-    let selectedCountry = null;
-    let selectedCategory = null;
+    const channelListEl = document.getElementById('channelList');
+    const channelTitleEl = document.getElementById('channelTitle');
 
-    // Lista de países con nombre y código (códigos basados en IPTV-org)
     const countries = [
       { code: 'ad', name: 'Andorra' },
       { code: 'ae', name: 'Emiratos Árabes Unidos' },
@@ -301,36 +299,43 @@
         const div = document.createElement('div');
         div.textContent = item.name || item;
         div.className = 'item';
-        div.onclick = () => clickHandler(item);
+        div.onclick = (event) => clickHandler(item, event);
         container.appendChild(div);
       });
     }
 
-    // Carga la lista de países inicialmente
-    createList(countries, countryListEl, async country => {
-      selectedCountry = country;
-      selectedCategory = null;
-      categoryListEl.innerHTML = 'Cargando categorías...';
+    createList(countries, countryListEl, async (country, event) => {
       // Marca selección visual
       Array.from(countryListEl.children).forEach(c => c.classList.remove('selected'));
       event.target.classList.add('selected');
 
-      // Descarga y parsea el archivo .m3u del país seleccionado
+      channelTitleEl.textContent = `Canales de ${country.name}`;
+      channelListEl.innerHTML = 'Cargando canales...';
+
       try {
         const res = await fetch(`https://iptv-org.github.io/iptv/countries/${country.code}.m3u`);
+        if(!res.ok) throw new Error('No se pudo cargar el archivo M3U');
         const text = await res.text();
-        channels = parseM3U(text);
-        // Obtiene categorías únicas
-        const categories = Array.from(new Set(channels.map(c => c.group || 'Sin categoría'))).sort();
-        createList(categories, categoryListEl, category => {
-          selectedCategory = category;
-          // Marca selección visual
-          Array.from(categoryListEl.children).forEach(c => c.classList.remove('selected'));
-          event.target.classList.add('selected');
-          showChannels(category);
+        const channels = parseM3U(text);
+
+        if (channels.length === 0) {
+          channelListEl.innerHTML = 'No se encontraron canales para este país.';
+          return;
+        }
+
+        channelListEl.innerHTML = '';
+        channels.forEach(ch => {
+          const el = document.createElement('div');
+          el.textContent = ch.name;
+          el.className = 'item';
+          el.onclick = () => {
+            player.src({ type: 'application/x-mpegURL', src: ch.url });
+            player.play();
+          };
+          channelListEl.appendChild(el);
         });
       } catch (e) {
-        categoryListEl.innerHTML = 'Error cargando categorías';
+        channelListEl.innerHTML = 'Error cargando canales.';
         console.error(e);
       }
     });
@@ -344,33 +349,11 @@
           const url = lines[i + 1];
           // extraer nombre
           const name = infoLine.split(',')[1] || 'Sin nombre';
-          // extraer grupo (category) si existe
-          let group = 'Sin categoría';
-          const matchGroup = infoLine.match(/group-title="([^"]+)"/i);
-          if (matchGroup) {
-            group = matchGroup[1];
-          }
-          result.push({ name, url, group });
+          result.push({ name, url });
           i++;
         }
       }
       return result;
-    }
-
-    function showChannels(category) {
-      main.innerHTML = '<h2>Canales: ' + category + '</h2>';
-      const cont = document.createElement('div');
-      channels.filter(c => c.group === category).forEach(ch => {
-        const el = document.createElement('div');
-        el.textContent = ch.name;
-        el.className = 'item';
-        el.onclick = () => {
-          player.src({ type: 'application/x-mpegURL', src: ch.url });
-          player.play();
-        };
-        cont.appendChild(el);
-      });
-      main.appendChild(cont);
     }
   </script>
 </body>
