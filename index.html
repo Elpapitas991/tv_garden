@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>TV Garden Simplificado - Canales por País</title>
+  <title>TV Garden con búsqueda global y reproducción continua</title>
   <link href="https://cdn.jsdelivr.net/npm/video.js@8.9.0/dist/video-js.min.css" rel="stylesheet"/>
   <style>
     body {
@@ -15,56 +15,95 @@
       height: 100vh;
       overflow: hidden;
     }
-    nav, main {
-      padding: 10px;
-      overflow-y: auto;
-    }
     nav {
-      width: 300px;
+      width: 320px;
       background: #111;
       border-right: 1px solid #333;
+      overflow-y: auto;
+      padding: 10px;
     }
-    main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding-top: 20px;
-    }
-    h2 {
+    nav h2 {
       margin-top: 0;
       margin-bottom: 10px;
       font-size: 1.2rem;
       border-bottom: 1px solid #444;
       padding-bottom: 5px;
     }
-    .item {
-      padding: 8px;
+    .country {
+      background: #222;
       margin-bottom: 5px;
-      background: #333;
-      border-radius: 4px;
+      border-radius: 5px;
       cursor: pointer;
       user-select: none;
+      padding: 8px;
+      font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
-    .item:hover {
+    .country:hover {
+      background: #444;
+    }
+    .channels {
+      background: #111;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+      border-left: 3px solid #0080ff;
+      margin-bottom: 10px;
+      border-radius: 0 5px 5px 0;
+      padding-left: 10px;
+    }
+    .channels.open {
+      max-height: 500px; /* o lo que necesites */
+      overflow-y: auto;
+    }
+    .channel {
+      padding: 6px 8px;
+      cursor: pointer;
+      border-radius: 4px;
+      margin: 3px 0;
+      background: #333;
+    }
+    .channel:hover {
       background: #555;
     }
     .selected {
       background: #0080ff !important;
+      color: #fff;
+    }
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      padding-top: 20px;
+      padding-left: 20px;
     }
     .video-container {
       width: 90%;
       max-width: 960px;
-      margin-bottom: 20px;
+      margin-bottom: 10px;
+      position: relative;
     }
-    .channel-list {
-      width: 90%;
-      max-width: 960px;
-      max-height: calc(100vh - 600px);
-      overflow-y: auto;
-      background: #111;
+    #channelSearch {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 8px;
       border-radius: 5px;
-      padding: 5px;
+      border: none;
+      font-size: 1rem;
+      outline: none;
+      width: 250px;
+      background: rgba(255,255,255,0.9);
+      color: #000;
+      z-index: 10;
+    }
+    h2#channelTitle {
+      margin: 0 0 10px 0;
+      color: #ddd;
     }
   </style>
 </head>
@@ -86,16 +125,16 @@
       >
         Tu navegador no soporta video.
       </video>
+      <input id="channelSearch" type="text" placeholder="Buscar canal o país..." />
     </div>
-    <h2 id="channelTitle">Selecciona un país para ver sus canales</h2>
-    <div id="channelList" class="channel-list"></div>
+    <h2 id="channelTitle">Selecciona un canal</h2>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/video.js@8.9.0/dist/video.min.js"></script>
   <script>
     let player = videojs('tv');
     const countryListEl = document.getElementById('countryList');
-    const channelListEl = document.getElementById('channelList');
+    const channelSearchEl = document.getElementById('channelSearch');
     const channelTitleEl = document.getElementById('channelTitle');
 
     const countries = [
@@ -293,52 +332,90 @@
       { code: 'zw', name: 'Zimbabue' }
     ];
 
-    function createList(items, container, clickHandler) {
-      container.innerHTML = '';
-      items.forEach(item => {
-        const div = document.createElement('div');
-        div.textContent = item.name || item;
-        div.className = 'item';
-        div.onclick = (event) => clickHandler(item, event);
-        container.appendChild(div);
+    // Aquí guardaremos todos los canales de todos los países, cargados
+    const countryChannels = {};
+    // También para búsqueda rápida, todos los canales con país
+    let allChannels = [];
+
+    function createCountryElement(country) {
+      const countryDiv = document.createElement('div');
+      countryDiv.className = 'country';
+      countryDiv.textContent = country.name;
+
+      const arrow = document.createElement('span');
+      arrow.textContent = '▼';
+      arrow.style.fontSize = '0.7rem';
+      arrow.style.transition = 'transform 0.3s ease';
+      countryDiv.appendChild(arrow);
+
+      const channelsDiv = document.createElement('div');
+      channelsDiv.className = 'channels';
+
+      countryDiv.addEventListener('click', async () => {
+        if (channelsDiv.classList.contains('open')) {
+          channelsDiv.classList.remove('open');
+          arrow.style.transform = 'rotate(0deg)';
+          // No pausamos ni quitamos reproducción aquí
+        } else {
+          // Cerrar otras abiertas
+          document.querySelectorAll('.channels.open').forEach(openDiv => {
+            openDiv.classList.remove('open');
+            openDiv.previousSibling.querySelector('span').style.transform = 'rotate(0deg)';
+          });
+
+          channelsDiv.classList.add('open');
+          arrow.style.transform = 'rotate(180deg)';
+          channelTitleEl.textContent = `Canales de ${country.name}`;
+
+          if (!countryChannels[country.code]) {
+            channelsDiv.innerHTML = 'Cargando canales...';
+            try {
+              const res = await fetch(`https://iptv-org.github.io/iptv/countries/${country.code}.m3u`);
+              if (!res.ok) throw new Error('Error al cargar M3U');
+              const text = await res.text();
+              const channels = parseM3U(text);
+              countryChannels[country.code] = channels;
+
+              // Añadir a la lista global
+              channels.forEach(ch => {
+                allChannels.push({
+                  ...ch,
+                  countryCode: country.code,
+                  countryName: country.name,
+                });
+              });
+
+              showChannels(channelsDiv, channels);
+            } catch (e) {
+              channelsDiv.innerHTML = 'Error cargando canales.';
+              console.error(e);
+            }
+          } else {
+            showChannels(channelsDiv, countryChannels[country.code]);
+          }
+        }
       });
+
+      return { countryDiv, channelsDiv };
     }
 
-    createList(countries, countryListEl, async (country, event) => {
-      // Marca selección visual
-      Array.from(countryListEl.children).forEach(c => c.classList.remove('selected'));
-      event.target.classList.add('selected');
-
-      channelTitleEl.textContent = `Canales de ${country.name}`;
-      channelListEl.innerHTML = 'Cargando canales...';
-
-      try {
-        const res = await fetch(`https://iptv-org.github.io/iptv/countries/${country.code}.m3u`);
-        if(!res.ok) throw new Error('No se pudo cargar el archivo M3U');
-        const text = await res.text();
-        const channels = parseM3U(text);
-
-        if (channels.length === 0) {
-          channelListEl.innerHTML = 'No se encontraron canales para este país.';
-          return;
-        }
-
-        channelListEl.innerHTML = '';
-        channels.forEach(ch => {
-          const el = document.createElement('div');
-          el.textContent = ch.name;
-          el.className = 'item';
-          el.onclick = () => {
-            player.src({ type: 'application/x-mpegURL', src: ch.url });
-            player.play();
-          };
-          channelListEl.appendChild(el);
-        });
-      } catch (e) {
-        channelListEl.innerHTML = 'Error cargando canales.';
-        console.error(e);
-      }
-    });
+    function showChannels(container, channels) {
+      container.innerHTML = '';
+      channels.forEach(ch => {
+        const chDiv = document.createElement('div');
+        chDiv.className = 'channel';
+        chDiv.textContent = ch.name + (ch.countryName ? ` (${ch.countryName})` : '');
+        chDiv.title = ch.name + (ch.countryName ? ` (${ch.countryName})` : '');
+        chDiv.onclick = () => {
+          player.src({ type: 'application/x-mpegURL', src: ch.url });
+          player.play();
+          clearSelection();
+          chDiv.classList.add('selected');
+          channelTitleEl.textContent = `Reproduciendo: ${ch.name} (${ch.countryName || ''})`;
+        };
+        container.appendChild(chDiv);
+      });
+    }
 
     function parseM3U(text) {
       const lines = text.split(/\r?\n/);
@@ -347,14 +424,87 @@
         if (lines[i].startsWith('#EXTINF')) {
           const infoLine = lines[i];
           const url = lines[i + 1];
-          // extraer nombre
-          const name = infoLine.split(',')[1] || 'Sin nombre';
+          // Nombre más limpio
+          let name = infoLine.split(',')[1] || 'Sin nombre';
+          // A veces tiene parámetros extra, quitamos si hay " group-title="
+          const idx = name.indexOf(' group-title=');
+          if (idx !== -1) name = name.substring(0, idx).trim();
           result.push({ name, url });
           i++;
         }
       }
       return result;
     }
+
+    function clearSelection() {
+      document.querySelectorAll('.channel.selected').forEach(ch => ch.classList.remove('selected'));
+    }
+
+    // Carga países en sidebar
+    countryListEl.innerHTML = '';
+    countries.forEach(country => {
+      const { countryDiv, channelsDiv } = createCountryElement(country);
+      countryDiv.setAttribute('data-code', country.code);
+      countryListEl.appendChild(countryDiv);
+      countryListEl.appendChild(channelsDiv);
+    });
+
+    // Búsqueda GLOBAL: filtra todos los canales de todos los países
+    channelSearchEl.addEventListener('input', () => {
+      const search = channelSearchEl.value.trim().toLowerCase();
+
+      // Si búsqueda vacía: cerrar todos los canales y borrar selección
+      if (!search) {
+        // Cerramos todos los acordeones
+        document.querySelectorAll('.channels.open').forEach(openDiv => {
+          openDiv.classList.remove('open');
+          openDiv.previousSibling.querySelector('span').style.transform = 'rotate(0deg)';
+        });
+        clearSelection();
+        channelTitleEl.textContent = 'Selecciona un canal';
+        return;
+      }
+
+      // Filtramos todos los canales globales que coincidan con búsqueda
+      const filtered = allChannels.filter(ch =>
+        ch.name.toLowerCase().includes(search) ||
+        ch.countryName.toLowerCase().includes(search)
+      );
+
+      // Cerramos todos los acordeones
+      document.querySelectorAll('.channels.open').forEach(openDiv => {
+        openDiv.classList.remove('open');
+        openDiv.previousSibling.querySelector('span').style.transform = 'rotate(0deg)';
+      });
+
+      // Mostramos resultados de búsqueda en sidebar, pero en un solo contenedor
+      countryListEl.innerHTML = '';
+
+      if (filtered.length === 0) {
+        countryListEl.textContent = 'No se encontraron canales.';
+        return;
+      }
+
+      // Creamos contenedor de búsqueda con resultados
+      const searchResultsDiv = document.createElement('div');
+      searchResultsDiv.className = 'channels open';
+      filtered.forEach(ch => {
+        const chDiv = document.createElement('div');
+        chDiv.className = 'channel';
+        chDiv.textContent = ch.name + ` (${ch.countryName})`;
+        chDiv.title = ch.name + ` (${ch.countryName})`;
+        chDiv.onclick = () => {
+          player.src({ type: 'application/x-mpegURL', src: ch.url });
+          player.play();
+          clearSelection();
+          chDiv.classList.add('selected');
+          channelTitleEl.textContent = `Reproduciendo: ${ch.name} (${ch.countryName})`;
+        };
+        searchResultsDiv.appendChild(chDiv);
+      });
+
+      countryListEl.appendChild(searchResultsDiv);
+    });
   </script>
 </body>
 </html>
