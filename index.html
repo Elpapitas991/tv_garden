@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>TV Garden con lista IPTV</title>
+  <link href="https://cdn.jsdelivr.net/npm/video.js@8.9.0/dist/video-js.min.css" rel="stylesheet"/>
+  <style>
+    body { margin:0; font-family:Arial,sans-serif; background:#000; color:#fff; display:flex; height:100vh; }
+    aside { width:300px; background:#111; padding:10px; overflow-y:auto; }
+    .chan { padding:8px; margin-bottom:5px; background:#222; border-radius:4px; cursor:pointer; }
+    .chan:hover { background:#333; }
+    main { flex:1; display:flex; align-items:center; justify-content:center; padding:10px; }
+    .vid { width:100%; max-width:960px; }
+  </style>
+</head>
+<body>
+  <aside>
+    <h2>Canales</h2>
+    <div id="channels">Cargando canales…</div>
+  </aside>
+  <main>
+    <div class="vid">
+      <video id="tv" class="video-js vjs-default-skin" controls autoplay preload="auto" width="960" height="540">
+        Tu navegador no soporta video.
+      </video>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/video.js@8.9.0/dist/video.min.js"></script>
+  <script>
+    const m3uUrl = 'https://iptv-org.github.io/iptv/index.m3u';
+    const player = videojs('tv');
+    async function loadM3U() {
+      const res = await fetch(m3uUrl);
+      const text = await res.text();
+      const lines = text.split(/\r?\n/);
+      const channels = [];
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].startsWith('#EXTINF')) {
+          const info = lines[i];
+          const url = lines[++i];
+          const name = info.split(',')[1] || 'Sin nombre';
+          channels.push({ name, url });
+        }
+      }
+      const container = document.getElementById('channels');
+      container.innerHTML = '';
+      channels.forEach(ch => {
+        const el = document.createElement('div');
+        el.textContent = ch.name;
+        el.className = 'chan';
+        el.onclick = () => {
+          player.src({ type: 'application/x-mpegURL', src: ch.url });
+          player.play();
+        };
+        container.appendChild(el);
+      });
+      // Cargar el primer canal por defecto
+      if (channels.length > 0) {
+        player.src({ type: 'application/x-mpegURL', src: channels[0].url });
+        player.play();
+      }
+    }
+    loadM3U();
+  </script>
+</body>
+</html>
