@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>TV Garden con búsqueda global y reproducción continua</title>
+  <title>TV Garden con búsqueda global precargada</title>
   <link href="https://cdn.jsdelivr.net/npm/video.js@8.9.0/dist/video-js.min.css" rel="stylesheet"/>
   <style>
     body {
@@ -55,7 +55,7 @@
       padding-left: 10px;
     }
     .channels.open {
-      max-height: 500px; /* o lo que necesites */
+      max-height: 500px;
       overflow-y: auto;
     }
     .channel {
@@ -110,7 +110,7 @@
 <body>
   <nav>
     <h2>Países</h2>
-    <div id="countryList">Cargando países...</div>
+    <div id="countryList">Cargando países y canales...</div>
   </nav>
   <main>
     <div class="video-container">
@@ -332,90 +332,8 @@
       { code: 'zw', name: 'Zimbabue' }
     ];
 
-    // Aquí guardaremos todos los canales de todos los países, cargados
-    const countryChannels = {};
-    // También para búsqueda rápida, todos los canales con país
-    let allChannels = [];
-
-    function createCountryElement(country) {
-      const countryDiv = document.createElement('div');
-      countryDiv.className = 'country';
-      countryDiv.textContent = country.name;
-
-      const arrow = document.createElement('span');
-      arrow.textContent = '▼';
-      arrow.style.fontSize = '0.7rem';
-      arrow.style.transition = 'transform 0.3s ease';
-      countryDiv.appendChild(arrow);
-
-      const channelsDiv = document.createElement('div');
-      channelsDiv.className = 'channels';
-
-      countryDiv.addEventListener('click', async () => {
-        if (channelsDiv.classList.contains('open')) {
-          channelsDiv.classList.remove('open');
-          arrow.style.transform = 'rotate(0deg)';
-          // No pausamos ni quitamos reproducción aquí
-        } else {
-          // Cerrar otras abiertas
-          document.querySelectorAll('.channels.open').forEach(openDiv => {
-            openDiv.classList.remove('open');
-            openDiv.previousSibling.querySelector('span').style.transform = 'rotate(0deg)';
-          });
-
-          channelsDiv.classList.add('open');
-          arrow.style.transform = 'rotate(180deg)';
-          channelTitleEl.textContent = `Canales de ${country.name}`;
-
-          if (!countryChannels[country.code]) {
-            channelsDiv.innerHTML = 'Cargando canales...';
-            try {
-              const res = await fetch(`https://iptv-org.github.io/iptv/countries/${country.code}.m3u`);
-              if (!res.ok) throw new Error('Error al cargar M3U');
-              const text = await res.text();
-              const channels = parseM3U(text);
-              countryChannels[country.code] = channels;
-
-              // Añadir a la lista global
-              channels.forEach(ch => {
-                allChannels.push({
-                  ...ch,
-                  countryCode: country.code,
-                  countryName: country.name,
-                });
-              });
-
-              showChannels(channelsDiv, channels);
-            } catch (e) {
-              channelsDiv.innerHTML = 'Error cargando canales.';
-              console.error(e);
-            }
-          } else {
-            showChannels(channelsDiv, countryChannels[country.code]);
-          }
-        }
-      });
-
-      return { countryDiv, channelsDiv };
-    }
-
-    function showChannels(container, channels) {
-      container.innerHTML = '';
-      channels.forEach(ch => {
-        const chDiv = document.createElement('div');
-        chDiv.className = 'channel';
-        chDiv.textContent = ch.name + (ch.countryName ? ` (${ch.countryName})` : '');
-        chDiv.title = ch.name + (ch.countryName ? ` (${ch.countryName})` : '');
-        chDiv.onclick = () => {
-          player.src({ type: 'application/x-mpegURL', src: ch.url });
-          player.play();
-          clearSelection();
-          chDiv.classList.add('selected');
-          channelTitleEl.textContent = `Reproduciendo: ${ch.name} (${ch.countryName || ''})`;
-        };
-        container.appendChild(chDiv);
-      });
-    }
+    const countryChannels = {}; // Canales por país
+    let allChannels = [];       // Todos los canales para búsqueda global
 
     function parseM3U(text) {
       const lines = text.split(/\r?\n/);
@@ -424,9 +342,7 @@
         if (lines[i].startsWith('#EXTINF')) {
           const infoLine = lines[i];
           const url = lines[i + 1];
-          // Nombre más limpio
           let name = infoLine.split(',')[1] || 'Sin nombre';
-          // A veces tiene parámetros extra, quitamos si hay " group-title="
           const idx = name.indexOf(' group-title=');
           if (idx !== -1) name = name.substring(0, idx).trim();
           result.push({ name, url });
@@ -436,48 +352,138 @@
       return result;
     }
 
+    function createCountryElement(country) {
+      const countryDiv = document.createElement('div');
+      countryDiv.className = 'country';
+      countryDiv.textContent = country.name;
+
+      const arrow = document.createElement('span');
+      arrow.textContent = '▶';
+      arrow.style.transition = 'transform 0.3s ease';
+      arrow.style.fontSize = '0.8em';
+      arrow.style.marginLeft = '6px';
+      countryDiv.appendChild(arrow);
+
+      const channelsDiv = document.createElement('div');
+      channelsDiv.className = 'channels';
+
+      countryDiv.addEventListener('click', () => {
+        const isOpen = channelsDiv.classList.contains('open');
+
+        if (isOpen) {
+          channelsDiv.classList.remove('open');
+          arrow.style.transform = 'rotate(0deg)';
+          // No pausamos video, la reproducción sigue
+        } else {
+          // Cerramos cualquier otro país abierto
+          document.querySelectorAll('.channels.open').forEach(openDiv => {
+            openDiv.classList.remove('open');
+            openDiv.previousSibling.querySelector('span').style.transform = 'rotate(0deg)';
+          });
+
+          channelsDiv.classList.add('open');
+          arrow.style.transform = 'rotate(90deg)';
+
+          channelTitleEl.textContent = `Canales de ${country.name}`;
+
+          if (!countryChannels[country.code]) {
+            channelsDiv.innerHTML = 'Cargando canales...';
+            // Pero con precarga ya no debería ocurrir, igual por seguridad:
+            fetch(`https://iptv-org.github.io/iptv/countries/${country.code}.m3u`)
+              .then(res => {
+                if (!res.ok) throw new Error('Error al cargar M3U');
+                return res.text();
+              })
+              .then(text => {
+                const channels = parseM3U(text);
+                countryChannels[country.code] = channels;
+                showChannels(channelsDiv, channels, country);
+              })
+              .catch(() => {
+                channelsDiv.innerHTML = 'Error cargando canales.';
+              });
+          } else {
+            showChannels(channelsDiv, countryChannels[country.code], country);
+          }
+        }
+      });
+
+      return { countryDiv, channelsDiv };
+    }
+
+    function showChannels(container, channels, country) {
+      container.innerHTML = '';
+      channels.forEach(ch => {
+        const chDiv = document.createElement('div');
+        chDiv.className = 'channel';
+        chDiv.textContent = ch.name + (country ? ` (${country.name})` : '');
+        chDiv.title = ch.name + (country ? ` (${country.name})` : '');
+        chDiv.onclick = () => {
+          player.src({ type: 'application/x-mpegURL', src: ch.url });
+          player.play();
+          clearSelection();
+          chDiv.classList.add('selected');
+          channelTitleEl.textContent = `Reproduciendo: ${ch.name} (${country ? country.name : ''})`;
+        };
+        container.appendChild(chDiv);
+      });
+    }
+
     function clearSelection() {
       document.querySelectorAll('.channel.selected').forEach(ch => ch.classList.remove('selected'));
     }
 
-    // Carga países en sidebar
-    countryListEl.innerHTML = '';
-    countries.forEach(country => {
-      const { countryDiv, channelsDiv } = createCountryElement(country);
-      countryDiv.setAttribute('data-code', country.code);
-      countryListEl.appendChild(countryDiv);
-      countryListEl.appendChild(channelsDiv);
-    });
+    async function preloadAllChannels() {
+      allChannels = [];
+      for (const country of countries) {
+        try {
+          const res = await fetch(`https://iptv-org.github.io/iptv/countries/${country.code}.m3u`);
+          if (!res.ok) continue;
+          const text = await res.text();
+          const channels = parseM3U(text);
+          countryChannels[country.code] = channels;
+          channels.forEach(ch => {
+            allChannels.push({
+              ...ch,
+              countryCode: country.code,
+              countryName: country.name,
+            });
+          });
+        } catch (e) {
+          console.warn(`Error cargando canales de ${country.name}`, e);
+        }
+      }
+      renderCountryList();
+      console.log('Carga completa de todos los canales');
+    }
 
-    // Búsqueda GLOBAL: filtra todos los canales de todos los países
+    function renderCountryList() {
+      countryListEl.innerHTML = '';
+      countries.forEach(country => {
+        const { countryDiv, channelsDiv } = createCountryElement(country);
+        countryDiv.setAttribute('data-code', country.code);
+        countryListEl.appendChild(countryDiv);
+        countryListEl.appendChild(channelsDiv);
+      });
+    }
+
     channelSearchEl.addEventListener('input', () => {
       const search = channelSearchEl.value.trim().toLowerCase();
 
-      // Si búsqueda vacía: cerrar todos los canales y borrar selección
       if (!search) {
-        // Cerramos todos los acordeones
-        document.querySelectorAll('.channels.open').forEach(openDiv => {
-          openDiv.classList.remove('open');
-          openDiv.previousSibling.querySelector('span').style.transform = 'rotate(0deg)';
-        });
+        // Si la búsqueda está vacía, volvemos a mostrar la lista completa de países
+        renderCountryList();
         clearSelection();
         channelTitleEl.textContent = 'Selecciona un canal';
         return;
       }
 
-      // Filtramos todos los canales globales que coincidan con búsqueda
+      // Filtramos todos los canales globales por búsqueda
       const filtered = allChannels.filter(ch =>
         ch.name.toLowerCase().includes(search) ||
         ch.countryName.toLowerCase().includes(search)
       );
 
-      // Cerramos todos los acordeones
-      document.querySelectorAll('.channels.open').forEach(openDiv => {
-        openDiv.classList.remove('open');
-        openDiv.previousSibling.querySelector('span').style.transform = 'rotate(0deg)';
-      });
-
-      // Mostramos resultados de búsqueda en sidebar, pero en un solo contenedor
       countryListEl.innerHTML = '';
 
       if (filtered.length === 0) {
@@ -485,14 +491,15 @@
         return;
       }
 
-      // Creamos contenedor de búsqueda con resultados
+      // Mostramos resultados en lista simple
       const searchResultsDiv = document.createElement('div');
       searchResultsDiv.className = 'channels open';
+
       filtered.forEach(ch => {
         const chDiv = document.createElement('div');
         chDiv.className = 'channel';
-        chDiv.textContent = ch.name + ` (${ch.countryName})`;
-        chDiv.title = ch.name + ` (${ch.countryName})`;
+        chDiv.textContent = `${ch.name} (${ch.countryName})`;
+        chDiv.title = `${ch.name} (${ch.countryName})`;
         chDiv.onclick = () => {
           player.src({ type: 'application/x-mpegURL', src: ch.url });
           player.play();
@@ -505,6 +512,9 @@
 
       countryListEl.appendChild(searchResultsDiv);
     });
+
+    // Inicia precarga y renderizado
+    preloadAllChannels();
   </script>
 </body>
 </html>
