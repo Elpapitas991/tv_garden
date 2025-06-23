@@ -3,39 +3,47 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mapa Interactivo TV Mundial</title>
-  <link href="https://cdn.jsdelivr.net/npm/video.js@8.9.0/dist/video-js.min.css" rel="stylesheet">
+  <title>TV Mundial Globo Interactivo</title>
   <style>
     body {
       margin: 0;
-      font-family: Arial, sans-serif;
-      background-color: #000;
-      color: #fff;
-    }
-    #map {
-      background-color: #111;
       display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 70vh;
+      flex-direction: row;
+      height: 100vh;
+      background: #000;
+      color: white;
+      font-family: sans-serif;
     }
-    svg path {
-      fill: #444;
-      stroke: #ccc;
-      cursor: pointer;
-      transition: fill 0.3s;
-    }
-    svg path:hover {
-      fill: #0080ff;
+    #globeViz {
+      flex: 2;
     }
     #sidebar {
-      padding: 1em;
+      width: 350px;
+      background: #111;
+      padding: 10px;
+      overflow-y: auto;
+      border-left: 1px solid #333;
+      display: flex;
+      flex-direction: column;
+    }
+    #sidebar h2 {
+      margin: 0 0 10px;
+      font-size: 1.2rem;
+    }
+    #channelSearch {
+      padding: 8px;
+      margin-bottom: 10px;
+      font-size: 1rem;
+      border-radius: 5px;
+      border: none;
+      width: 100%;
+      box-sizing: border-box;
     }
     .channel {
       background: #222;
-      padding: 5px 10px;
+      padding: 5px;
       margin: 5px 0;
-      border-radius: 5px;
+      border-radius: 4px;
       cursor: pointer;
     }
     .channel:hover {
@@ -45,11 +53,12 @@
       display: none;
       position: fixed;
       top: 0; left: 0;
-      width: 100%; height: 100%;
-      background-color: rgba(0, 0, 0, 0.9);
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.9);
       justify-content: center;
       align-items: center;
-      z-index: 999;
+      z-index: 1000;
     }
     #playerModal.active {
       display: flex;
@@ -65,93 +74,121 @@
   </style>
 </head>
 <body>
+  <div id="globeViz"></div>
+  <div id="sidebar">
+    <h2>Canales de TV</h2>
+    <input type="text" id="channelSearch" placeholder="Buscar canal...">
+    <div id="channels"></div>
+  </div>
+  <div id="playerModal">
+    <div id="closePlayer">&times;</div>
+    <video id="tv" controls autoplay width="800" height="450"></video>
+  </div>
 
-<div id="map">
-  <svg viewBox="0 0 800 400" width="800" height="400">
-    <path id="us" d="M150 150 L180 150 L180 180 L150 180 Z" title="Estados Unidos" />
-    <path id="mx" d="M150 190 L180 190 L180 220 L150 220 Z" title="México" />
-    <path id="ca" d="M150 110 L180 110 L180 140 L150 140 Z" title="Canadá" />
-    <path id="es" d="M600 180 L630 180 L630 210 L600 210 Z" title="España" />
-    <path id="ar" d="M300 350 L330 350 L330 380 L300 380 Z" title="Argentina" />
-  </svg>
-</div>
+  <!-- Scripts -->
+  <script src="https://unpkg.com/three"></script>
+  <script src="https://unpkg.com/globe.gl"></script>
+  <script>
+    const countries = [
+      { code: 'us', name: 'Estados Unidos' },
+      { code: 'mx', name: 'México' },
+      { code: 'ca', name: 'Canadá' },
+      { code: 'es', name: 'España' },
+      { code: 'ar', name: 'Argentina' }
+    ];
 
-<div id="sidebar">
-  <h2 id="countryName">Selecciona un país</h2>
-  <div id="channels"></div>
-</div>
+    const countryData = countries.map(c => ({
+      name: c.name,
+      code: c.code.toLowerCase(),
+      lat: 0,
+      lng: 0
+    }));
 
-<div id="playerModal">
-  <div id="closePlayer">&times;</div>
-  <video-js id="tv" class="video-js vjs-default-skin" controls preload="auto" width="720" height="405">
-    <source src="" type="application/x-mpegURL">
-    Tu navegador no soporta video.
-  </video-js>
-</div>
+    // Coordenadas aproximadas
+    const coords = {
+      us: [37, -95],
+      mx: [23, -102],
+      ca: [56, -106],
+      es: [40, -4],
+      ar: [-34, -64]
+    };
+    countryData.forEach(c => {
+      [c.lat, c.lng] = coords[c.code];
+    });
 
-<script src="https://cdn.jsdelivr.net/npm/video.js@8.9.0/dist/video.min.js"></script>
-<script>
-  const player = videojs('tv');
-  const playerModal = document.getElementById('playerModal');
-  const closePlayer = document.getElementById('closePlayer');
+    const world = Globe()(document.getElementById('globeViz'))
+      .pointOfView({ lat: 20, lng: 0, altitude: 2 })
+      .labelsData(countryData)
+      .labelLat(d => d.lat)
+      .labelLng(d => d.lng)
+      .labelText(d => d.name)
+      .labelSize(1.2)
+      .labelDotRadius(0.3)
+      .onLabelClick(d => selectCountry(d.code, d.name));
 
-  const countryMap = {
-    us: 'Estados Unidos',
-    mx: 'México',
-    ca: 'Canadá',
-    es: 'España',
-    ar: 'Argentina'
-  };
+    const allChannels = [];
+    const channelsDiv = document.getElementById('channels');
+    const searchInput = document.getElementById('channelSearch');
+    const playerModal = document.getElementById('playerModal');
+    const closePlayer = document.getElementById('closePlayer');
+    const videoPlayer = document.getElementById('tv');
 
-  document.querySelectorAll('svg path').forEach(path => {
-    path.addEventListener('click', async () => {
-      const code = path.id;
-      const name = countryMap[code];
-      document.getElementById('countryName').textContent = `Canales de ${name}`;
-      const container = document.getElementById('channels');
-      container.innerHTML = '<em>Cargando canales...</em>';
-
+    async function loadCountryChannels(code, name) {
       try {
         const res = await fetch(`https://iptv-org.github.io/iptv/countries/${code}.m3u`);
         const text = await res.text();
-        const channels = parseM3U(text);
-        container.innerHTML = '';
-        channels.forEach(ch => {
-          const div = document.createElement('div');
-          div.className = 'channel';
-          div.textContent = ch.name;
-          div.onclick = () => {
-            player.src({ type: 'application/x-mpegURL', src: ch.url });
-            player.play();
-            playerModal.classList.add('active');
-          };
-          container.appendChild(div);
-        });
-      } catch (err) {
-        container.innerHTML = '<em>Error al cargar canales.</em>';
-      }
-    });
-  });
-
-  closePlayer.onclick = () => {
-    player.pause();
-    playerModal.classList.remove('active');
-  };
-
-  function parseM3U(text) {
-    const lines = text.split('\n');
-    const result = [];
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].startsWith('#EXTINF')) {
-        const name = lines[i].split(',')[1] || 'Canal sin nombre';
-        const url = lines[i + 1];
-        result.push({ name, url });
-        i++;
+        const channels = parseM3U(text).map(ch => ({ ...ch, country: name }));
+        allChannels.push(...channels);
+        renderChannels(allChannels);
+      } catch (e) {
+        console.error('Error al cargar canales de', code);
       }
     }
-    return result;
-  }
-</script>
 
+    function parseM3U(text) {
+      const lines = text.split('\n');
+      const result = [];
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].startsWith('#EXTINF')) {
+          const name = lines[i].split(',')[1] || 'Sin nombre';
+          const url = lines[i + 1];
+          if (url) result.push({ name, url });
+          i++;
+        }
+      }
+      return result;
+    }
+
+    function renderChannels(list) {
+      channelsDiv.innerHTML = '';
+      list.forEach(ch => {
+        const div = document.createElement('div');
+        div.className = 'channel';
+        div.textContent = `${ch.name} (${ch.country})`;
+        div.onclick = () => {
+          videoPlayer.src = ch.url;
+          playerModal.classList.add('active');
+        };
+        channelsDiv.appendChild(div);
+      });
+    }
+
+    function selectCountry(code, name) {
+      loadCountryChannels(code, name);
+    }
+
+    searchInput.addEventListener('input', () => {
+      const search = searchInput.value.toLowerCase();
+      const filtered = allChannels.filter(ch =>
+        ch.name.toLowerCase().includes(search) || ch.country.toLowerCase().includes(search)
+      );
+      renderChannels(filtered);
+    });
+
+    closePlayer.onclick = () => {
+      playerModal.classList.remove('active');
+      videoPlayer.pause();
+    };
+  </script>
 </body>
 </html>
