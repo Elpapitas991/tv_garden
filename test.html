@@ -6,8 +6,7 @@
   <title>TV Mundial Globo Interactivo</title>
   <style>
     html, body {
-      margin: 0;
-      padding: 0;
+      margin: 0; padding: 0;
       height: 100%;
       background: #000;
       color: white;
@@ -18,22 +17,25 @@
       display: flex;
       height: 100vh;
       width: 100vw;
+      min-width: 700px; /* asegura espacio para sidebar */
     }
     #globeViz {
-      flex: 1 1 70%;
-      height: 100%;
+      flex-grow: 1;
+      min-width: 0; /* importante para evitar overflow */
+      height: 100vh;
     }
     #sidebar {
-      flex: 1 1 30%;
+      width: 320px; /* ancho fijo para sidebar */
       background: #111;
       padding: 10px;
-      overflow-y: auto;
       display: flex;
       flex-direction: column;
+      overflow-y: auto;
     }
     #sidebar h2 {
       margin: 0 0 10px;
       font-size: 1.2rem;
+      flex-shrink: 0;
     }
     #channelSearch {
       padding: 8px;
@@ -43,10 +45,12 @@
       border: none;
       width: 100%;
       box-sizing: border-box;
+      flex-shrink: 0;
     }
     #channels {
-      flex: 1;
+      flex-grow: 1;
       overflow-y: auto;
+      min-height: 0; /* para que scrollbar funcione */
     }
     .channel {
       background: #222;
@@ -79,6 +83,7 @@
       font-size: 2rem;
       cursor: pointer;
       color: white;
+      z-index: 1001;
     }
   </style>
 </head>
@@ -97,7 +102,7 @@
     <video id="tv" controls autoplay width="800" height="450"></video>
   </div>
 
-  <!-- Scripts -->
+  <!-- Scripts (igual que antes) -->
   <script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
   <script src="https://unpkg.com/globe.gl"></script>
   <script>
