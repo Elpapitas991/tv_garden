@@ -25,35 +25,33 @@
       height: 100vh;
     }
     #sidebar {
-  width: 320px;
-  background: #111;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  height: 100vh;       /* <-- altura fija para que no desaparezca */
-  overflow-y: auto;
-}
-
-#channels {
-  flex-grow: 1;
-  overflow-y: auto;
-  min-height: 0;       /* <-- evita que se colapse el scroll */
-}
-
-#channelSearch {
-  padding: 8px;
-  margin-bottom: 10px;
-  font-size: 1rem;
-  border-radius: 5px;
-  border: none;
-  width: 100%;
-  box-sizing: border-box;
-  flex-shrink: 0;
-}
+      width: 320px; /* ancho fijo para sidebar */
+      background: #111;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      height: 100vh; /* asegura que ocupe toda la altura */
+      overflow-y: auto;
+    }
+    #sidebar h2 {
+      margin: 0 0 10px;
+      font-size: 1.2rem;
+      flex-shrink: 0;
+    }
+    #channelSearch {
+      padding: 8px;
+      margin-bottom: 10px;
+      font-size: 1rem;
+      border-radius: 5px;
+      border: none;
+      width: 100%;
+      box-sizing: border-box;
+      flex-shrink: 0;
+    }
     #channels {
       flex-grow: 1;
       overflow-y: auto;
-      min-height: 0; /* para que scrollbar funcione */
+      min-height: 0; /* evita que se colapse el scroll */
     }
     .channel {
       background: #222;
@@ -105,7 +103,7 @@
     <video id="tv" controls autoplay width="800" height="450"></video>
   </div>
 
-  <!-- Scripts (igual que antes) -->
+  <!-- Scripts -->
   <script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
   <script src="https://unpkg.com/globe.gl"></script>
   <script>
