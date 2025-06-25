@@ -191,9 +191,8 @@
         div.className = 'channel';
         div.textContent = `${ch.name} (${ch.country})`;
         div.onclick = () => {
-          videoPlayer.src = ch.url;
-          playerModal.classList.add('active');
-        };
+  playStream(ch.url);
+};
         channelsDiv.appendChild(div);
       });
     }
@@ -218,5 +217,31 @@
       videoPlayer.pause();
     };
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+  let hlsInstance = null;
+
+  function playStream(url) {
+    if (hlsInstance) {
+      hlsInstance.destroy();
+      hlsInstance = null;
+    }
+
+    if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
+      videoPlayer.src = url;
+    } else if (Hls.isSupported()) {
+      hlsInstance = new Hls();
+      hlsInstance.loadSource(url);
+      hlsInstance.attachMedia(videoPlayer);
+    } else {
+      alert("Este navegador no soporta reproducción HLS");
+    }
+
+    playerModal.classList.add('active');
+    videoPlayer.play().catch(() => {
+      console.warn("Reproducción bloqueada por el navegador. Dale play manual.");
+    });
+  }
+</script>
 </body>
 </html>
