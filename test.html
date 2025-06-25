@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>TV Mundial sin globo</title>
+  <title>TV Mundial sin Globo</title>
   <style>
     * { box-sizing: border-box; }
     html, body {
@@ -15,9 +15,24 @@
       font-family: sans-serif;
       overflow: hidden;
     }
+    #topbar {
+      height: 50px;
+      background: #111;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      padding: 0 15px;
+    }
+    #channelSearch {
+      padding: 8px;
+      font-size: 1rem;
+      border-radius: 5px;
+      border: none;
+      width: 300px;
+    }
     #app {
       display: flex;
-      height: 100vh;
+      height: calc(100vh - 50px); /* deja espacio para la barra superior */
       width: 100vw;
     }
     #sidebar {
@@ -51,18 +66,11 @@
       height: 16px;
       object-fit: cover;
     }
-    #channelSearch {
-      padding: 8px;
-      margin-bottom: 10px;
-      font-size: 1rem;
-      border-radius: 5px;
-      border: none;
-      width: 100%;
-    }
     #channels {
       flex-grow: 1;
       overflow-y: auto;
       min-height: 0;
+      padding: 10px;
     }
     .channel {
       background: #222;
@@ -100,13 +108,16 @@
   </style>
 </head>
 <body>
+  <div id="topbar">
+    <input type="text" id="channelSearch" placeholder="Buscar canal o país...">
+  </div>
+
   <div id="app">
     <div id="sidebar">
-      <h2>Canales por país</h2>
+      <h2>Países disponibles</h2>
       <div id="countryList"></div>
-      <input type="text" id="channelSearch" placeholder="Buscar canal o país...">
-      <div id="channels"></div>
     </div>
+    <div id="channels"></div>
   </div>
 
   <div id="playerModal">
@@ -124,6 +135,7 @@
     ];
 
     const allChannels = [];
+    const loadedCountries = new Set();
     const countryList = document.getElementById('countryList');
     const channelsDiv = document.getElementById('channels');
     const searchInput = document.getElementById('channelSearch');
@@ -131,7 +143,7 @@
     const closePlayer = document.getElementById('closePlayer');
     const videoPlayer = document.getElementById('tv');
 
-    // Render países con bandera
+    // Render banderas con nombres
     countries.forEach(c => {
       const div = document.createElement('div');
       div.className = 'country';
@@ -144,12 +156,15 @@
     });
 
     async function loadCountryChannels(code, name) {
+      if (loadedCountries.has(code)) return; // evitar recargar el mismo país
+      loadedCountries.add(code);
+
       try {
         const res = await fetch(`https://iptv-org.github.io/iptv/countries/${code}.m3u`);
         const text = await res.text();
         const newChannels = parseM3U(text).map(ch => ({ ...ch, country: name }));
         allChannels.push(...newChannels);
-        renderChannels(allChannels);
+        renderChannels(allChannels); // muestra todos los cargados
       } catch (e) {
         console.error('Error al cargar canales de', name, e);
       }
