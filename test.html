@@ -199,12 +199,19 @@
     }
 
     searchInput.addEventListener('input', () => {
-      const search = searchInput.value.toLowerCase();
-      const filtered = allChannels.filter(ch =>
-        ch.name.toLowerCase().includes(search) || ch.country.toLowerCase().includes(search)
-      );
-      renderChannels(filtered);
-    });
+  const search = searchInput.value.toLowerCase().trim();
+
+  if (search === '') {
+    renderChannels(allChannels); // mostrar todo si está vacío
+    return;
+  }
+
+  const filtered = allChannels.filter(ch =>
+    ch.name.toLowerCase().includes(search) || ch.country.toLowerCase().includes(search)
+  );
+
+  renderChannels(filtered);
+});
 
     closePlayer.onclick = () => {
       playerModal.classList.remove('active');
