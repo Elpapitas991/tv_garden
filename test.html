@@ -23,12 +23,31 @@
       align-items: center;
       padding: 0 15px;
     }
+    #searchWrapper {
+      position: relative;
+      width: 300px;
+    }
     #channelSearch {
-      padding: 8px;
+      width: 100%;
+      padding: 8px 30px 8px 8px;
       font-size: 1rem;
       border-radius: 5px;
       border: none;
-      width: 300px;
+    }
+    #clearSearch {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      font-weight: bold;
+      color: #888;
+      font-size: 18px;
+      user-select: none;
+      display: none;
+    }
+    #clearSearch:hover {
+      color: #ccc;
     }
     #app {
       display: flex;
@@ -42,6 +61,12 @@
       display: flex;
       flex-direction: column;
       overflow-y: auto;
+    }
+    #loadingMessage {
+      color: #aaa;
+      font-style: italic;
+      padding: 5px 10px;
+      margin-bottom: 10px;
     }
     #countryList {
       display: flex;
@@ -109,12 +134,16 @@
 </head>
 <body>
   <div id="topbar">
-    <input type="text" id="channelSearch" placeholder="Buscar canal o país...">
+    <div id="searchWrapper">
+      <input type="text" id="channelSearch" placeholder="Buscar canal o país...">
+      <span id="clearSearch">&times;</span>
+    </div>
   </div>
 
   <div id="app">
     <div id="sidebar">
       <h2>Países disponibles</h2>
+      <div id="loadingMessage" style="display:none;">Cargando canales...</div>
       <div id="countryList"></div>
     </div>
     <div id="channels"></div>
@@ -141,10 +170,13 @@
     const countryList = document.getElementById('countryList');
     const channelsDiv = document.getElementById('channels');
     const searchInput = document.getElementById('channelSearch');
+    const clearSearch = document.getElementById('clearSearch');
+    const loadingMessage = document.getElementById('loadingMessage');
     const playerModal = document.getElementById('playerModal');
     const closePlayer = document.getElementById('closePlayer');
     const videoPlayer = document.getElementById('tv');
     let hlsInstance = null;
+    let currentCountryCode = null;
 
     // Render lista de países con banderas
     countries.forEach(c => {
@@ -159,18 +191,36 @@
     });
 
     async function loadCountryChannels(code, name) {
+      if (currentCountryCode === code) {
+        // Si el mismo país fue clicado otra vez, limpiar lista
+        allChannels.length = 0;
+        currentCountryCode = null;
+        renderChannels([]);
+        searchInput.value = '';
+        clearSearch.style.display = 'none';
+        loadingMessage.style.display = 'none';
+        return;
+      }
+
+      currentCountryCode = code;
+
+      // Limpiar lista y mostrar mensaje de carga
+      allChannels.length = 0;
+      renderChannels([]);
+      searchInput.value = '';
+      clearSearch.style.display = 'none';
+      loadingMessage.style.display = 'block';
+
       try {
         const res = await fetch(`https://iptv-org.github.io/iptv/countries/${code}.m3u`);
         const text = await res.text();
         const newChannels = parseM3U(text).map(ch => ({ ...ch, country: name }));
 
-        // Reemplazar canales anteriores
-        allChannels.length = 0;
         allChannels.push(...newChannels);
-
+        loadingMessage.style.display = 'none';
         renderChannels(allChannels);
-        searchInput.value = '';
       } catch (e) {
+        loadingMessage.textContent = 'Error al cargar canales.';
         console.error('Error al cargar canales de', name, e);
       }
     }
@@ -226,7 +276,10 @@
     }
 
     searchInput.addEventListener('input', () => {
-      const search = searchInput.value.toLowerCase().trim();
+      const val = searchInput.value;
+      clearSearch.style.display = val.length > 0 ? 'block' : 'none';
+
+      const search = val.toLowerCase().trim();
       if (search === '') {
         renderChannels(allChannels);
         return;
@@ -236,6 +289,13 @@
       );
       renderChannels(filtered);
     });
+
+    clearSearch.onclick = () => {
+      searchInput.value = '';
+      clearSearch.style.display = 'none';
+      renderChannels(allChannels);
+      searchInput.focus();
+    };
 
     closePlayer.onclick = () => {
       playerModal.classList.remove('active');
