@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>TV Mundial sin Globo</title>
+  <title>TV Mundial - Test</title>
   <style>
     * { box-sizing: border-box; }
     html, body {
@@ -32,7 +32,7 @@
     }
     #app {
       display: flex;
-      height: calc(100vh - 50px); /* deja espacio para la barra superior */
+      height: calc(100vh - 50px);
       width: 100vw;
     }
     #sidebar {
@@ -125,6 +125,9 @@
     <video id="tv" controls autoplay width="800" height="450"></video>
   </div>
 
+  <!-- HLS.js para soporte .m3u8 en todos los navegadores -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
   <script>
     const countries = [
       { code: 'us', name: 'Estados Unidos' },
@@ -135,15 +138,15 @@
     ];
 
     const allChannels = [];
-    const loadedCountries = new Set();
     const countryList = document.getElementById('countryList');
     const channelsDiv = document.getElementById('channels');
     const searchInput = document.getElementById('channelSearch');
     const playerModal = document.getElementById('playerModal');
     const closePlayer = document.getElementById('closePlayer');
     const videoPlayer = document.getElementById('tv');
+    let hlsInstance = null;
 
-    // Render banderas con nombres
+    // Render lista de países con banderas
     countries.forEach(c => {
       const div = document.createElement('div');
       div.className = 'country';
@@ -156,15 +159,17 @@
     });
 
     async function loadCountryChannels(code, name) {
-      if (loadedCountries.has(code)) return; // evitar recargar el mismo país
-      loadedCountries.add(code);
-
       try {
         const res = await fetch(`https://iptv-org.github.io/iptv/countries/${code}.m3u`);
         const text = await res.text();
         const newChannels = parseM3U(text).map(ch => ({ ...ch, country: name }));
+
+        // Reemplazar canales anteriores
+        allChannels.length = 0;
         allChannels.push(...newChannels);
-        renderChannels(allChannels); // muestra todos los cargados
+
+        renderChannels(allChannels);
+        searchInput.value = '';
       } catch (e) {
         console.error('Error al cargar canales de', name, e);
       }
@@ -191,57 +196,51 @@
         div.className = 'channel';
         div.textContent = `${ch.name} (${ch.country})`;
         div.onclick = () => {
-  playStream(ch.url);
-};
+          playStream(ch.url);
+        };
         channelsDiv.appendChild(div);
       });
     }
 
+    function playStream(url) {
+      if (hlsInstance) {
+        hlsInstance.destroy();
+        hlsInstance = null;
+      }
+
+      if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
+        videoPlayer.src = url;
+      } else if (Hls.isSupported()) {
+        hlsInstance = new Hls();
+        hlsInstance.loadSource(url);
+        hlsInstance.attachMedia(videoPlayer);
+      } else {
+        alert("Este navegador no soporta reproducción HLS");
+        return;
+      }
+
+      playerModal.classList.add('active');
+      videoPlayer.play().catch(() => {
+        console.warn("Reproducción bloqueada por el navegador.");
+      });
+    }
+
     searchInput.addEventListener('input', () => {
-  const search = searchInput.value.toLowerCase().trim();
-
-  if (search === '') {
-    renderChannels(allChannels); // mostrar todo si está vacío
-    return;
-  }
-
-  const filtered = allChannels.filter(ch =>
-    ch.name.toLowerCase().includes(search) || ch.country.toLowerCase().includes(search)
-  );
-
-  renderChannels(filtered);
-});
+      const search = searchInput.value.toLowerCase().trim();
+      if (search === '') {
+        renderChannels(allChannels);
+        return;
+      }
+      const filtered = allChannels.filter(ch =>
+        ch.name.toLowerCase().includes(search) || ch.country.toLowerCase().includes(search)
+      );
+      renderChannels(filtered);
+    });
 
     closePlayer.onclick = () => {
       playerModal.classList.remove('active');
       videoPlayer.pause();
     };
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-<script>
-  let hlsInstance = null;
-
-  function playStream(url) {
-    if (hlsInstance) {
-      hlsInstance.destroy();
-      hlsInstance = null;
-    }
-
-    if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
-      videoPlayer.src = url;
-    } else if (Hls.isSupported()) {
-      hlsInstance = new Hls();
-      hlsInstance.loadSource(url);
-      hlsInstance.attachMedia(videoPlayer);
-    } else {
-      alert("Este navegador no soporta reproducción HLS");
-    }
-
-    playerModal.classList.add('active');
-    videoPlayer.play().catch(() => {
-      console.warn("Reproducción bloqueada por el navegador. Dale play manual.");
-    });
-  }
-</script>
 </body>
 </html>
