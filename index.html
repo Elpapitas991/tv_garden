@@ -2,519 +2,305 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>TV Garden con búsqueda global precargada</title>
-  <link href="https://cdn.jsdelivr.net/npm/video.js@8.9.0/dist/video-js.min.css" rel="stylesheet"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TV Mundial - Test</title>
   <style>
-    body {
+    * { box-sizing: border-box; }
+    html, body {
       margin: 0;
-      font-family: Arial, sans-serif;
+      padding: 0;
+      height: 100%;
       background: #000;
-      color: #fff;
-      display: flex;
-      height: 100vh;
+      color: white;
+      font-family: sans-serif;
       overflow: hidden;
     }
-    nav {
+    #topbar {
+      height: 50px;
+      background: #111;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      padding: 0 15px;
+    }
+    #searchWrapper {
+      position: relative;
+      width: 300px;
+    }
+    #channelSearch {
+      width: 100%;
+      padding: 8px 30px 8px 8px;
+      font-size: 1rem;
+      border-radius: 5px;
+      border: none;
+    }
+    #clearSearch {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      font-weight: bold;
+      color: #888;
+      font-size: 18px;
+      user-select: none;
+      display: none;
+    }
+    #clearSearch:hover {
+      color: #ccc;
+    }
+    #app {
+      display: flex;
+      height: calc(100vh - 50px);
+      width: 100vw;
+    }
+    #sidebar {
       width: 320px;
       background: #111;
-      border-right: 1px solid #333;
-      overflow-y: auto;
       padding: 10px;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
     }
-    nav h2 {
-      margin-top: 0;
+    #loadingMessage {
+      color: #aaa;
+      font-style: italic;
+      padding: 5px 10px;
       margin-bottom: 10px;
-      font-size: 1.2rem;
-      border-bottom: 1px solid #444;
-      padding-bottom: 5px;
+    }
+    #countryList {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
     }
     .country {
       background: #222;
-      margin-bottom: 5px;
-      border-radius: 5px;
-      cursor: pointer;
-      user-select: none;
       padding: 8px;
-      font-weight: bold;
+      border-radius: 4px;
+      cursor: pointer;
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      gap: 10px;
     }
     .country:hover {
-      background: #444;
-    }
-    .channels {
-      background: #111;
-      max-height: 0;
-      overflow: hidden;
-      transition: max-height 0.3s ease;
-      border-left: 3px solid #0080ff;
-      margin-bottom: 10px;
-      border-radius: 0 5px 5px 0;
-      padding-left: 10px;
-    }
-    .channels.open {
-      max-height: 500px;
-      overflow-y: auto;
-    }
-    .channel {
-      padding: 6px 8px;
-      cursor: pointer;
-      border-radius: 4px;
-      margin: 3px 0;
       background: #333;
     }
+    .flag {
+      width: 24px;
+      height: 16px;
+      object-fit: cover;
+    }
+    #channels {
+      flex-grow: 1;
+      overflow-y: auto;
+      min-height: 0;
+      padding: 10px;
+    }
+    .channel {
+      background: #222;
+      padding: 5px;
+      margin: 5px 0;
+      border-radius: 4px;
+      cursor: pointer;
+    }
     .channel:hover {
-      background: #555;
+      background: #444;
     }
-    .selected {
-      background: #0080ff !important;
-      color: #fff;
-    }
-    main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
+    #playerModal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.9);
+      justify-content: center;
       align-items: center;
-      position: relative;
-      padding-top: 20px;
-      padding-left: 20px;
+      z-index: 1000;
     }
-    .video-container {
-      width: 90%;
-      max-width: 960px;
-      margin-bottom: 10px;
-      position: relative;
+    #playerModal.active {
+      display: flex;
     }
-    #channelSearch {
+    #closePlayer {
       position: absolute;
       top: 10px;
-      right: 10px;
-      padding: 8px;
-      border-radius: 5px;
-      border: none;
-      font-size: 1rem;
-      outline: none;
-      width: 250px;
-      background: rgba(255,255,255,0.9);
-      color: #000;
-      z-index: 10;
-    }
-    h2#channelTitle {
-      margin: 0 0 10px 0;
-      color: #ddd;
+      right: 20px;
+      font-size: 2rem;
+      cursor: pointer;
+      color: white;
+      z-index: 1001;
     }
   </style>
 </head>
 <body>
-  <nav>
-    <h2>Países</h2>
-    <div id="countryList">Cargando países y canales...</div>
-  </nav>
-  <main>
-    <div class="video-container">
-      <video
-        id="tv"
-        class="video-js vjs-default-skin"
-        controls
-        autoplay
-        preload="auto"
-        width="960"
-        height="540"
-      >
-        Tu navegador no soporta video.
-      </video>
-      <input id="channelSearch" type="text" placeholder="Buscar canal o país..." />
+  <div id="topbar">
+    <div id="searchWrapper">
+      <input type="text" id="channelSearch" placeholder="Buscar canal o país...">
+      <span id="clearSearch">&times;</span>
     </div>
-    <h2 id="channelTitle">Selecciona un canal</h2>
-  </main>
+  </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/video.js@8.9.0/dist/video.min.js"></script>
+  <div id="app">
+    <div id="sidebar">
+      <h2>Países disponibles</h2>
+      <div id="loadingMessage" style="display:none;">Cargando canales...</div>
+      <div id="countryList"></div>
+    </div>
+    <div id="channels"></div>
+  </div>
+
+  <div id="playerModal">
+    <div id="closePlayer">&times;</div>
+    <video id="tv" controls autoplay width="800" height="450"></video>
+  </div>
+
+  <!-- HLS.js para soporte .m3u8 en todos los navegadores -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
   <script>
-    let player = videojs('tv');
-    const countryListEl = document.getElementById('countryList');
-    const channelSearchEl = document.getElementById('channelSearch');
-    const channelTitleEl = document.getElementById('channelTitle');
-
     const countries = [
-      { code: 'ad', name: 'Andorra' },
-      { code: 'ae', name: 'Emiratos Árabes Unidos' },
-      { code: 'af', name: 'Afganistán' },
-      { code: 'ag', name: 'Antigua y Barbuda' },
-      { code: 'ai', name: 'Anguila' },
-      { code: 'al', name: 'Albania' },
-      { code: 'am', name: 'Armenia' },
-      { code: 'ao', name: 'Angola' },
-      { code: 'ar', name: 'Argentina' },
-      { code: 'at', name: 'Austria' },
-      { code: 'au', name: 'Australia' },
-      { code: 'aw', name: 'Aruba' },
-      { code: 'az', name: 'Azerbaiyán' },
-      { code: 'ba', name: 'Bosnia y Herzegovina' },
-      { code: 'bb', name: 'Barbados' },
-      { code: 'bd', name: 'Bangladesh' },
-      { code: 'be', name: 'Bélgica' },
-      { code: 'bf', name: 'Burkina Faso' },
-      { code: 'bg', name: 'Bulgaria' },
-      { code: 'bh', name: 'Bahrein' },
-      { code: 'bi', name: 'Burundi' },
-      { code: 'bj', name: 'Benín' },
-      { code: 'bm', name: 'Bermudas' },
-      { code: 'bn', name: 'Brunéi' },
-      { code: 'bo', name: 'Bolivia' },
-      { code: 'br', name: 'Brasil' },
-      { code: 'bs', name: 'Bahamas' },
-      { code: 'bt', name: 'Bután' },
-      { code: 'bw', name: 'Botsuana' },
-      { code: 'by', name: 'Bielorrusia' },
-      { code: 'bz', name: 'Belice' },
-      { code: 'ca', name: 'Canadá' },
-      { code: 'cd', name: 'República Democrática del Congo' },
-      { code: 'cf', name: 'República Centroafricana' },
-      { code: 'cg', name: 'Congo' },
-      { code: 'ch', name: 'Suiza' },
-      { code: 'ci', name: 'Costa de Marfil' },
-      { code: 'cl', name: 'Chile' },
-      { code: 'cm', name: 'Camerún' },
-      { code: 'cn', name: 'China' },
-      { code: 'co', name: 'Colombia' },
-      { code: 'cr', name: 'Costa Rica' },
-      { code: 'cu', name: 'Cuba' },
-      { code: 'cv', name: 'Cabo Verde' },
-      { code: 'cy', name: 'Chipre' },
-      { code: 'cz', name: 'República Checa' },
-      { code: 'de', name: 'Alemania' },
-      { code: 'dj', name: 'Yibuti' },
-      { code: 'dk', name: 'Dinamarca' },
-      { code: 'dm', name: 'Dominica' },
-      { code: 'do', name: 'República Dominicana' },
-      { code: 'dz', name: 'Argelia' },
-      { code: 'ec', name: 'Ecuador' },
-      { code: 'ee', name: 'Estonia' },
-      { code: 'eg', name: 'Egipto' },
-      { code: 'es', name: 'España' },
-      { code: 'et', name: 'Etiopía' },
-      { code: 'fi', name: 'Finlandia' },
-      { code: 'fj', name: 'Fiyi' },
-      { code: 'fm', name: 'Micronesia' },
-      { code: 'fr', name: 'Francia' },
-      { code: 'ga', name: 'Gabón' },
-      { code: 'gb', name: 'Reino Unido' },
-      { code: 'gd', name: 'Granada' },
-      { code: 'ge', name: 'Georgia' },
-      { code: 'gh', name: 'Ghana' },
-      { code: 'gm', name: 'Gambia' },
-      { code: 'gn', name: 'Guinea' },
-      { code: 'gq', name: 'Guinea Ecuatorial' },
-      { code: 'gr', name: 'Grecia' },
-      { code: 'gt', name: 'Guatemala' },
-      { code: 'gw', name: 'Guinea-Bisáu' },
-      { code: 'gy', name: 'Guyana' },
-      { code: 'hn', name: 'Honduras' },
-      { code: 'hr', name: 'Croacia' },
-      { code: 'ht', name: 'Haití' },
-      { code: 'hu', name: 'Hungría' },
-      { code: 'id', name: 'Indonesia' },
-      { code: 'ie', name: 'Irlanda' },
-      { code: 'il', name: 'Israel' },
-      { code: 'in', name: 'India' },
-      { code: 'iq', name: 'Irak' },
-      { code: 'ir', name: 'Irán' },
-      { code: 'is', name: 'Islandia' },
-      { code: 'it', name: 'Italia' },
-      { code: 'jm', name: 'Jamaica' },
-      { code: 'jo', name: 'Jordania' },
-      { code: 'jp', name: 'Japón' },
-      { code: 'ke', name: 'Kenia' },
-      { code: 'kg', name: 'Kirguistán' },
-      { code: 'kh', name: 'Camboya' },
-      { code: 'ki', name: 'Kiribati' },
-      { code: 'km', name: 'Comoras' },
-      { code: 'kn', name: 'San Cristóbal y Nieves' },
-      { code: 'kp', name: 'Corea del Norte' },
-      { code: 'kr', name: 'Corea del Sur' },
-      { code: 'kw', name: 'Kuwait' },
-      { code: 'ky', name: 'Islas Caimán' },
-      { code: 'kz', name: 'Kazajistán' },
-      { code: 'la', name: 'Laos' },
-      { code: 'lb', name: 'Líbano' },
-      { code: 'lc', name: 'Santa Lucía' },
-      { code: 'li', name: 'Liechtenstein' },
-      { code: 'lk', name: 'Sri Lanka' },
-      { code: 'lr', name: 'Liberia' },
-      { code: 'ls', name: 'Lesoto' },
-      { code: 'lt', name: 'Lituania' },
-      { code: 'lu', name: 'Luxemburgo' },
-      { code: 'lv', name: 'Letonia' },
-      { code: 'ly', name: 'Libia' },
-      { code: 'ma', name: 'Marruecos' },
-      { code: 'mc', name: 'Mónaco' },
-      { code: 'md', name: 'Moldavia' },
-      { code: 'me', name: 'Montenegro' },
-      { code: 'mg', name: 'Madagascar' },
-      { code: 'mk', name: 'Macedonia del Norte' },
-      { code: 'ml', name: 'Malí' },
-      { code: 'mm', name: 'Myanmar' },
-      { code: 'mn', name: 'Mongolia' },
-      { code: 'mr', name: 'Mauritania' },
-      { code: 'mt', name: 'Malta' },
-      { code: 'mu', name: 'Mauricio' },
-      { code: 'mv', name: 'Maldivas' },
-      { code: 'mw', name: 'Malawi' },
-      { code: 'mx', name: 'México' },
-      { code: 'my', name: 'Malasia' },
-      { code: 'mz', name: 'Mozambique' },
-      { code: 'na', name: 'Namibia' },
-      { code: 'nc', name: 'Nueva Caledonia' },
-      { code: 'ne', name: 'Níger' },
-      { code: 'ng', name: 'Nigeria' },
-      { code: 'ni', name: 'Nicaragua' },
-      { code: 'nl', name: 'Países Bajos' },
-      { code: 'no', name: 'Noruega' },
-      { code: 'np', name: 'Nepal' },
-      { code: 'nz', name: 'Nueva Zelanda' },
-      { code: 'om', name: 'Omán' },
-      { code: 'pa', name: 'Panamá' },
-      { code: 'pe', name: 'Perú' },
-      { code: 'pg', name: 'Papúa Nueva Guinea' },
-      { code: 'ph', name: 'Filipinas' },
-      { code: 'pk', name: 'Pakistán' },
-      { code: 'pl', name: 'Polonia' },
-      { code: 'pt', name: 'Portugal' },
-      { code: 'py', name: 'Paraguay' },
-      { code: 'qa', name: 'Qatar' },
-      { code: 'ro', name: 'Rumania' },
-      { code: 'rs', name: 'Serbia' },
-      { code: 'ru', name: 'Rusia' },
-      { code: 'rw', name: 'Ruanda' },
-      { code: 'sa', name: 'Arabia Saudita' },
-      { code: 'sb', name: 'Islas Salomón' },
-      { code: 'sc', name: 'Seychelles' },
-      { code: 'sd', name: 'Sudán' },
-      { code: 'se', name: 'Suecia' },
-      { code: 'sg', name: 'Singapur' },
-      { code: 'si', name: 'Eslovenia' },
-      { code: 'sk', name: 'Eslovaquia' },
-      { code: 'sl', name: 'Sierra Leona' },
-      { code: 'sn', name: 'Senegal' },
-      { code: 'so', name: 'Somalia' },
-      { code: 'sr', name: 'Surinam' },
-      { code: 'st', name: 'Santo Tomé y Príncipe' },
-      { code: 'sv', name: 'El Salvador' },
-      { code: 'sy', name: 'Siria' },
-      { code: 'sz', name: 'Suazilandia' },
-      { code: 'td', name: 'Chad' },
-      { code: 'tg', name: 'Togo' },
-      { code: 'th', name: 'Tailandia' },
-      { code: 'tj', name: 'Tayikistán' },
-      { code: 'tl', name: 'Timor Oriental' },
-      { code: 'tm', name: 'Turkmenistán' },
-      { code: 'tn', name: 'Túnez' },
-      { code: 'to', name: 'Tonga' },
-      { code: 'tr', name: 'Turquía' },
-      { code: 'tt', name: 'Trinidad y Tobago' },
-      { code: 'tv', name: 'Tuvalu' },
-      { code: 'tz', name: 'Tanzania' },
-      { code: 'ua', name: 'Ucrania' },
-      { code: 'ug', name: 'Uganda' },
       { code: 'us', name: 'Estados Unidos' },
-      { code: 'uy', name: 'Uruguay' },
-      { code: 'uz', name: 'Uzbekistán' },
-      { code: 'vc', name: 'San Vicente y las Granadinas' },
-      { code: 've', name: 'Venezuela' },
-      { code: 'vn', name: 'Vietnam' },
-      { code: 'vu', name: 'Vanuatu' },
-      { code: 'ws', name: 'Samoa' },
-      { code: 'ye', name: 'Yemen' },
-      { code: 'za', name: 'Sudáfrica' },
-      { code: 'zm', name: 'Zambia' },
-      { code: 'zw', name: 'Zimbabue' }
+      { code: 'mx', name: 'México' },
+      { code: 'ca', name: 'Canadá' },
+      { code: 'es', name: 'España' },
+      { code: 'ar', name: 'Argentina' }
     ];
 
-    const countryChannels = {}; // Canales por país
-    let allChannels = [];       // Todos los canales para búsqueda global
+    const allChannels = [];
+    const countryList = document.getElementById('countryList');
+    const channelsDiv = document.getElementById('channels');
+    const searchInput = document.getElementById('channelSearch');
+    const clearSearch = document.getElementById('clearSearch');
+    const loadingMessage = document.getElementById('loadingMessage');
+    const playerModal = document.getElementById('playerModal');
+    const closePlayer = document.getElementById('closePlayer');
+    const videoPlayer = document.getElementById('tv');
+    let hlsInstance = null;
+    let currentCountryCode = null;
+
+    // Render lista de países con banderas
+    countries.forEach(c => {
+      const div = document.createElement('div');
+      div.className = 'country';
+      div.innerHTML = `
+        <img class="flag" src="https://flagcdn.com/w40/${c.code}.png" alt="${c.name}">
+        <span>${c.name}</span>
+      `;
+      div.onclick = () => loadCountryChannels(c.code, c.name);
+      countryList.appendChild(div);
+    });
+
+    async function loadCountryChannels(code, name) {
+      if (currentCountryCode === code) {
+        // Si el mismo país fue clicado otra vez, limpiar lista
+        allChannels.length = 0;
+        currentCountryCode = null;
+        renderChannels([]);
+        searchInput.value = '';
+        clearSearch.style.display = 'none';
+        loadingMessage.style.display = 'none';
+        return;
+      }
+
+      currentCountryCode = code;
+
+      // Limpiar lista y mostrar mensaje de carga
+      allChannels.length = 0;
+      renderChannels([]);
+      searchInput.value = '';
+      clearSearch.style.display = 'none';
+      loadingMessage.style.display = 'block';
+
+      try {
+        const res = await fetch(`https://iptv-org.github.io/iptv/countries/${code}.m3u`);
+        const text = await res.text();
+        const newChannels = parseM3U(text).map(ch => ({ ...ch, country: name }));
+
+        allChannels.push(...newChannels);
+        loadingMessage.style.display = 'none';
+        renderChannels(allChannels);
+      } catch (e) {
+        loadingMessage.textContent = 'Error al cargar canales.';
+        console.error('Error al cargar canales de', name, e);
+      }
+    }
 
     function parseM3U(text) {
-      const lines = text.split(/\r?\n/);
+      const lines = text.split('\n');
       const result = [];
       for (let i = 0; i < lines.length; i++) {
         if (lines[i].startsWith('#EXTINF')) {
-          const infoLine = lines[i];
+          const name = lines[i].split(',')[1] || 'Sin nombre';
           const url = lines[i + 1];
-          let name = infoLine.split(',')[1] || 'Sin nombre';
-          const idx = name.indexOf(' group-title=');
-          if (idx !== -1) name = name.substring(0, idx).trim();
-          result.push({ name, url });
+          if (url) result.push({ name, url });
           i++;
         }
       }
       return result;
     }
 
-    function createCountryElement(country) {
-      const countryDiv = document.createElement('div');
-      countryDiv.className = 'country';
-      countryDiv.textContent = country.name;
-
-      const arrow = document.createElement('span');
-      arrow.textContent = '▶';
-      arrow.style.transition = 'transform 0.3s ease';
-      arrow.style.fontSize = '0.8em';
-      arrow.style.marginLeft = '6px';
-      countryDiv.appendChild(arrow);
-
-      const channelsDiv = document.createElement('div');
-      channelsDiv.className = 'channels';
-
-      countryDiv.addEventListener('click', () => {
-        const isOpen = channelsDiv.classList.contains('open');
-
-        if (isOpen) {
-          channelsDiv.classList.remove('open');
-          arrow.style.transform = 'rotate(0deg)';
-          // No pausamos video, la reproducción sigue
-        } else {
-          // Cerramos cualquier otro país abierto
-          document.querySelectorAll('.channels.open').forEach(openDiv => {
-            openDiv.classList.remove('open');
-            openDiv.previousSibling.querySelector('span').style.transform = 'rotate(0deg)';
-          });
-
-          channelsDiv.classList.add('open');
-          arrow.style.transform = 'rotate(90deg)';
-
-          channelTitleEl.textContent = `Canales de ${country.name}`;
-
-          if (!countryChannels[country.code]) {
-            channelsDiv.innerHTML = 'Cargando canales...';
-            // Pero con precarga ya no debería ocurrir, igual por seguridad:
-            fetch(`https://iptv-org.github.io/iptv/countries/${country.code}.m3u`)
-              .then(res => {
-                if (!res.ok) throw new Error('Error al cargar M3U');
-                return res.text();
-              })
-              .then(text => {
-                const channels = parseM3U(text);
-                countryChannels[country.code] = channels;
-                showChannels(channelsDiv, channels, country);
-              })
-              .catch(() => {
-                channelsDiv.innerHTML = 'Error cargando canales.';
-              });
-          } else {
-            showChannels(channelsDiv, countryChannels[country.code], country);
-          }
-        }
-      });
-
-      return { countryDiv, channelsDiv };
-    }
-
-    function showChannels(container, channels, country) {
-      container.innerHTML = '';
-      channels.forEach(ch => {
-        const chDiv = document.createElement('div');
-        chDiv.className = 'channel';
-        chDiv.textContent = ch.name + (country ? ` (${country.name})` : '');
-        chDiv.title = ch.name + (country ? ` (${country.name})` : '');
-        chDiv.onclick = () => {
-          player.src({ type: 'application/x-mpegURL', src: ch.url });
-          player.play();
-          clearSelection();
-          chDiv.classList.add('selected');
-          channelTitleEl.textContent = `Reproduciendo: ${ch.name} (${country ? country.name : ''})`;
+    function renderChannels(list) {
+      channelsDiv.innerHTML = '';
+      list.forEach(ch => {
+        const div = document.createElement('div');
+        div.className = 'channel';
+        div.textContent = `${ch.name} (${ch.country})`;
+        div.onclick = () => {
+          playStream(ch.url);
         };
-        container.appendChild(chDiv);
+        channelsDiv.appendChild(div);
       });
     }
 
-    function clearSelection() {
-      document.querySelectorAll('.channel.selected').forEach(ch => ch.classList.remove('selected'));
-    }
-
-    async function preloadAllChannels() {
-      allChannels = [];
-      for (const country of countries) {
-        try {
-          const res = await fetch(`https://iptv-org.github.io/iptv/countries/${country.code}.m3u`);
-          if (!res.ok) continue;
-          const text = await res.text();
-          const channels = parseM3U(text);
-          countryChannels[country.code] = channels;
-          channels.forEach(ch => {
-            allChannels.push({
-              ...ch,
-              countryCode: country.code,
-              countryName: country.name,
-            });
-          });
-        } catch (e) {
-          console.warn(`Error cargando canales de ${country.name}`, e);
-        }
+    function playStream(url) {
+      if (hlsInstance) {
+        hlsInstance.destroy();
+        hlsInstance = null;
       }
-      renderCountryList();
-      console.log('Carga completa de todos los canales');
-    }
 
-    function renderCountryList() {
-      countryListEl.innerHTML = '';
-      countries.forEach(country => {
-        const { countryDiv, channelsDiv } = createCountryElement(country);
-        countryDiv.setAttribute('data-code', country.code);
-        countryListEl.appendChild(countryDiv);
-        countryListEl.appendChild(channelsDiv);
-      });
-    }
-
-    channelSearchEl.addEventListener('input', () => {
-      const search = channelSearchEl.value.trim().toLowerCase();
-
-      if (!search) {
-        // Si la búsqueda está vacía, volvemos a mostrar la lista completa de países
-        renderCountryList();
-        clearSelection();
-        channelTitleEl.textContent = 'Selecciona un canal';
+      if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
+        videoPlayer.src = url;
+      } else if (Hls.isSupported()) {
+        hlsInstance = new Hls();
+        hlsInstance.loadSource(url);
+        hlsInstance.attachMedia(videoPlayer);
+      } else {
+        alert("Este navegador no soporta reproducción HLS");
         return;
       }
 
-      // Filtramos todos los canales globales por búsqueda
+      playerModal.classList.add('active');
+      videoPlayer.play().catch(() => {
+        console.warn("Reproducción bloqueada por el navegador.");
+      });
+    }
+
+    searchInput.addEventListener('input', () => {
+      const val = searchInput.value;
+      clearSearch.style.display = val.length > 0 ? 'block' : 'none';
+
+      const search = val.toLowerCase().trim();
+      if (search === '') {
+        renderChannels(allChannels);
+        return;
+      }
       const filtered = allChannels.filter(ch =>
-        ch.name.toLowerCase().includes(search) ||
-        ch.countryName.toLowerCase().includes(search)
+        ch.name.toLowerCase().includes(search) || ch.country.toLowerCase().includes(search)
       );
-
-      countryListEl.innerHTML = '';
-
-      if (filtered.length === 0) {
-        countryListEl.textContent = 'No se encontraron canales.';
-        return;
-      }
-
-      // Mostramos resultados en lista simple
-      const searchResultsDiv = document.createElement('div');
-      searchResultsDiv.className = 'channels open';
-
-      filtered.forEach(ch => {
-        const chDiv = document.createElement('div');
-        chDiv.className = 'channel';
-        chDiv.textContent = `${ch.name} (${ch.countryName})`;
-        chDiv.title = `${ch.name} (${ch.countryName})`;
-        chDiv.onclick = () => {
-          player.src({ type: 'application/x-mpegURL', src: ch.url });
-          player.play();
-          clearSelection();
-          chDiv.classList.add('selected');
-          channelTitleEl.textContent = `Reproduciendo: ${ch.name} (${ch.countryName})`;
-        };
-        searchResultsDiv.appendChild(chDiv);
-      });
-
-      countryListEl.appendChild(searchResultsDiv);
+      renderChannels(filtered);
     });
 
-    // Inicia precarga y renderizado
-    preloadAllChannels();
+    clearSearch.onclick = () => {
+      searchInput.value = '';
+      clearSearch.style.display = 'none';
+      renderChannels(allChannels);
+      searchInput.focus();
+    };
+
+    closePlayer.onclick = () => {
+      playerModal.classList.remove('active');
+      videoPlayer.pause();
+    };
   </script>
 </body>
 </html>
