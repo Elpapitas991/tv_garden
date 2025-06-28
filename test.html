@@ -19,7 +19,8 @@
       background: #111;
       padding: 10px;
       display: flex;
-      justify-content: flex-end;
+      flex-direction: column;
+      align-items: flex-end;
     }
 
     #channelSearch {
@@ -27,6 +28,21 @@
       font-size: 16px;
       width: 100%;
       max-width: 300px;
+    }
+
+    #previewContainer {
+      width: 100%;
+      background: #111;
+      padding: 5px;
+      border-top: 1px solid #333;
+      margin-top: 10px;
+    }
+
+    #previewPlayer {
+      width: 100%;
+      max-height: 240px;
+      cursor: pointer;
+      outline: none;
     }
 
     #main {
@@ -94,6 +110,7 @@
       font-size: 2rem;
       color: white;
       cursor: pointer;
+      z-index: 20;
     }
 
     video {
@@ -128,12 +145,16 @@
       }
 
       #topbar {
-        flex-direction: column;
         align-items: flex-end;
       }
 
       #channelSearch {
         width: 100%;
+        max-width: none;
+      }
+
+      #previewContainer {
+        max-height: 180px;
       }
     }
   </style>
@@ -141,6 +162,9 @@
 <body>
   <div id="topbar">
     <input type="text" id="channelSearch" placeholder="Buscar canal o país...">
+    <div id="previewContainer">
+      <video id="previewPlayer" muted autoplay controls></video>
+    </div>
   </div>
 
   <div id="main">
@@ -161,6 +185,7 @@
     const tv = document.getElementById('tv');
     const close = document.getElementById('close');
     const searchInput = document.getElementById('channelSearch');
+    const previewPlayer = document.getElementById('previewPlayer');
 
     let currentCountryCode = null;
     let allChannels = [];
@@ -233,16 +258,23 @@
     }
 
     function playChannel(url) {
-      if (hls) { hls.destroy(); hls = null; }
-      if (Hls.isSupported()) {
-        hls = new Hls();
-        hls.loadSource(url);
-        hls.attachMedia(tv);
-      } else {
-        tv.src = url;
-      }
-      player.classList.add('active');
-      tv.play().catch(() => {});
+      // Reproduce en el preview
+      previewPlayer.src = url;
+      previewPlayer.play().catch(() => {});
+
+      // Al hacer click en preview, abre el reproductor grande
+      previewPlayer.onclick = () => {
+        if (hls) { hls.destroy(); hls = null; }
+        if (Hls.isSupported()) {
+          hls = new Hls();
+          hls.loadSource(url);
+          hls.attachMedia(tv);
+        } else {
+          tv.src = url;
+        }
+        player.classList.add('active');
+        tv.play().catch(() => {});
+      };
     }
 
     close.onclick = () => {
