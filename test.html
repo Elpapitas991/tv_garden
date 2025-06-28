@@ -3,148 +3,93 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>TV Mundial - Layout 3 columnas</title>
+  <title>TV Mundial - Preview con info y buen player</title>
   <style>
     body {
-      margin: 0;
-      font-family: sans-serif;
-      background: #000;
-      color: white;
+      margin: 0; font-family: sans-serif;
+      background: #000; color: white;
       height: 100vh;
-      display: flex;
-      flex-direction: column;
+      display: flex; flex-direction: column;
     }
-
     #topbar {
-      background: #111;
-      padding: 10px;
-      display: flex;
-      justify-content: flex-end;
+      background: #111; padding: 10px;
+      display: flex; justify-content: flex-end;
     }
-
     #channelSearch {
-      padding: 6px;
-      font-size: 16px;
-      width: 300px;
+      padding: 6px; font-size: 16px; width: 300px;
     }
-
     #main {
       flex: 1;
-      display: flex;
-      overflow: hidden;
-      gap: 10px;
-      padding: 10px;
+      display: flex; overflow: hidden;
+      gap: 10px; padding: 10px;
     }
-
     #countries {
-      width: 200px;
-      background: #111;
-      padding: 10px;
-      overflow-y: auto;
-      border-radius: 6px;
-      max-height: 100%;
+      width: 200px; background: #111;
+      padding: 10px; overflow-y: auto;
+      border-radius: 6px; max-height: 100%;
     }
-
     .country {
-      background: #222;
-      padding: 8px;
-      margin-bottom: 6px;
-      border-radius: 4px;
-      cursor: pointer;
-      user-select: none;
+      background: #222; padding: 8px;
+      margin-bottom: 6px; border-radius: 4px;
+      cursor: pointer; user-select: none;
     }
-
     .country:hover {
       background: #333;
     }
-
     #channels {
-      flex: 1;
-      background: #111;
-      padding: 10px;
-      overflow-y: auto;
-      border-radius: 6px;
-      max-height: 100%;
+      flex: 1; background: #111;
+      padding: 10px; overflow-y: auto;
+      border-radius: 6px; max-height: 100%;
     }
-
     .channel {
-      background: #222;
-      padding: 8px;
-      margin-bottom: 6px;
-      border-radius: 4px;
-      cursor: pointer;
-      user-select: none;
+      background: #222; padding: 8px;
+      margin-bottom: 6px; border-radius: 4px;
+      cursor: pointer; user-select: none;
     }
-
     .channel:hover {
       background: #444;
     }
-
     #previewContainer {
-      width: 320px;
-      background: #111;
-      padding: 10px;
-      border-radius: 6px;
-      max-height: 100%;
-      box-sizing: border-box;
-      display: flex;
-      flex-direction: column;
+      width: 320px; background: #111;
+      padding: 10px; border-radius: 6px;
+      max-height: 100%; box-sizing: border-box;
+      display: flex; flex-direction: column;
       justify-content: flex-start;
     }
-
     #previewPlayer {
-      width: 100%;
-      height: 180px;
-      cursor: pointer;
-      outline: none;
-      border-radius: 4px;
-      background: black;
+      width: 100%; height: 180px;
+      cursor: pointer; outline: none;
+      border-radius: 4px; background: black;
     }
-
+    #channelInfo {
+      margin-top: 8px; font-size: 14px;
+      color: #ccc; user-select: none;
+    }
     #player {
-      display: none;
-      position: fixed;
-      top: 0; left: 0;
-      width: 100vw; height: 100vh;
-      background: rgba(0, 0, 0, 0.9);
-      justify-content: center;
-      align-items: center;
+      display: none; position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.9);
+      justify-content: center; align-items: center;
       z-index: 10;
     }
-
     #player.active {
       display: flex;
     }
-
     #close {
-      position: absolute;
-      top: 10px;
-      right: 20px;
-      font-size: 2rem;
-      color: white;
-      cursor: pointer;
-      z-index: 20;
-      user-select: none;
+      position: absolute; top: 10px; right: 20px;
+      font-size: 2rem; color: white; cursor: pointer;
+      z-index: 20; user-select: none;
     }
-
     #player video {
-      max-width: 90%;
-      max-height: 90%;
+      max-width: 90%; max-height: 90%;
     }
-
-    /* Responsive para móviles */
     @media (max-width: 900px) {
       #main {
-        flex-direction: column;
-        padding: 10px 5px;
+        flex-direction: column; padding: 10px 5px;
       }
-
       #countries, #channels, #previewContainer {
-        width: 100%;
-        max-height: 200px;
-        margin-bottom: 10px;
+        width: 100%; max-height: 200px; margin-bottom: 10px;
       }
-
       #previewPlayer {
         height: 160px;
       }
@@ -161,6 +106,10 @@
     <div id="channels"></div>
     <div id="previewContainer">
       <video id="previewPlayer" muted autoplay controls></video>
+      <div id="channelInfo">
+        <div id="channelName"></div>
+        <div id="localTime"></div>
+      </div>
     </div>
   </div>
 
@@ -178,11 +127,14 @@
     const close = document.getElementById('close');
     const searchInput = document.getElementById('channelSearch');
     const previewPlayer = document.getElementById('previewPlayer');
+    const channelNameEl = document.getElementById('channelName');
+    const localTimeEl = document.getElementById('localTime');
 
     let currentCountryCode = null;
     let allChannels = [];
     let visibleChannels = [];
     let hls;
+    let previewHls;
 
     const countries = [
       { code: 'ar', name: 'Argentina' },
@@ -203,24 +155,23 @@
         currentCountryCode = null;
         visibleChannels = [];
         renderChannels([]);
+        clearPreview();
         return;
       }
-
       currentCountryCode = code;
       const alreadyLoaded = allChannels.some(c => c.code === code);
       if (alreadyLoaded) {
         visibleChannels = allChannels.filter(c => c.code === code);
         renderChannels(visibleChannels);
+        clearPreview();
         return;
       }
-
       channelsEl.innerHTML = `<p>Cargando canales de ${name}...</p>`;
       try {
         const res = await fetch(`https://iptv-org.github.io/iptv/countries/${code}.m3u`);
         const txt = await res.text();
-        const lines = txt.split('\n');
         const list = [];
-
+        const lines = txt.split('\n');
         for (let i = 0; i < lines.length; i++) {
           if (lines[i].startsWith('#EXTINF')) {
             const chName = lines[i].split(',')[1] || 'Sin nombre';
@@ -229,12 +180,13 @@
             i++;
           }
         }
-
-        allChannels.push(...list);
+        allChannels = allChannels.filter(c => c.code !== code).concat(list);
         visibleChannels = list;
         renderChannels(list);
+        clearPreview();
       } catch (e) {
         channelsEl.innerHTML = `<p>Error al cargar canales de ${name}</p>`;
+        clearPreview();
       }
     }
 
@@ -244,29 +196,55 @@
         const div = document.createElement('div');
         div.className = 'channel';
         div.textContent = `${ch.name} (${ch.country})`;
-        div.onclick = () => playChannel(ch.url);
+        div.onclick = () => playChannel(ch.url, ch);
         channelsEl.appendChild(div);
       });
     }
 
-    function playChannel(url) {
-      // Reproducir en el preview
-      if (previewPlayer.hls) {
-        previewPlayer.hls.destroy();
-        previewPlayer.hls = null;
+    // Mapea código país a zona horaria para mostrar hora local
+    const timezoneMap = {
+      'ar': 'America/Argentina/Buenos_Aires',
+      'es': 'Europe/Madrid',
+      'us': 'America/New_York',
+    };
+
+    function updateLocalTime(countryCode) {
+      const tz = timezoneMap[countryCode] || 'UTC';
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('es-ES', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
+      localTimeEl.textContent = `Hora local: ${timeStr}`;
+    }
+
+    function clearPreview() {
+      channelNameEl.textContent = '';
+      localTimeEl.textContent = '';
+      if (previewHls) {
+        previewHls.destroy();
+        previewHls = null;
+      }
+      previewPlayer.pause();
+      previewPlayer.src = '';
+    }
+
+    function playChannel(url, channel) {
+      channelNameEl.textContent = channel.name;
+      updateLocalTime(channel.code);
+
+      // Preview player
+      if (previewHls) {
+        previewHls.destroy();
+        previewHls = null;
       }
       if (Hls.isSupported() && url.endsWith('.m3u8')) {
-        const hlsPreview = new Hls();
-        hlsPreview.loadSource(url);
-        hlsPreview.attachMedia(previewPlayer);
-        hlsPreview.on(Hls.Events.MANIFEST_PARSED, () => previewPlayer.play());
-        previewPlayer.hls = hlsPreview;
+        previewHls = new Hls();
+        previewHls.loadSource(url);
+        previewHls.attachMedia(previewPlayer);
+        previewHls.on(Hls.Events.MANIFEST_PARSED, () => previewPlayer.play());
       } else {
         previewPlayer.src = url;
         previewPlayer.play().catch(() => {});
       }
 
-      // Al hacer click en preview, abrir reproductor grande
       previewPlayer.onclick = () => {
         if (hls) {
           hls.destroy();
@@ -288,6 +266,7 @@
     close.onclick = () => {
       player.classList.remove('active');
       tv.pause();
+      tv.src = '';
     };
 
     searchInput.addEventListener('input', () => {
@@ -296,12 +275,19 @@
         renderChannels(visibleChannels);
         return;
       }
-
       const filtered = allChannels.filter(ch =>
         ch.name.toLowerCase().includes(val) || ch.country.toLowerCase().includes(val)
       );
       renderChannels(filtered);
+      clearPreview();
     });
+
+    // Actualizar hora local cada minuto para preview
+    setInterval(() => {
+      if (channelNameEl.textContent && currentCountryCode) {
+        updateLocalTime(currentCountryCode);
+      }
+    }, 60000);
   </script>
 </body>
 </html>
