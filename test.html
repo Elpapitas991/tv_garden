@@ -1,112 +1,124 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8"/>
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>TV Mundial – Versión Estable</title>
+  <title>TV Mundial (Test)</title>
   <style>
-    * { box-sizing: border-box; }
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      background: #000;
-      color: white;
+    body {
+      margin: 0; padding: 0;
       font-family: sans-serif;
-      overflow: hidden;
+      background: #000; color: white;
     }
     #topbar {
-      height: 50px;
-      display: flex;
-      justify-content: flex-end;
-      align-items: center;
-      background: #111;
-      padding: 0 15px;
-    }
-    #searchWrapper {
-      position: relative;
-      width: 300px;
-    }
-    #channelSearch {
-      width: 100%;
-      padding: 8px 30px 8px 8px;
-      font-size: 1rem;
-      border-radius: 5px;
-      border: none;
-    }
-    #clearSearch {
-      position: absolute;
-      right: 8px;
-      top: 50%;
-      transform: translateY(-50%);
-      cursor: pointer;
-      color: #888;
-      font-size: 18px;
-      display: none;
-      user-select: none;
-    }
-    #clearSearch:hover { color: #ccc; }
-    #app {
-      display: flex;
-      height: calc(100vh - 50px);
-      width: 100vw;
-    }
-    #sidebar {
-      width: 320px;
       background: #111;
       padding: 10px;
+      text-align: right;
+    }
+    #channelSearch {
+      padding: 6px;
+      font-size: 16px;
+      width: 250px;
+    }
+    #main {
       display: flex;
-      flex-direction: column;
+      height: calc(100vh - 50px);
+    }
+    #countries {
+      width: 250px;
+      background: #111;
+      padding: 10px;
       overflow-y: auto;
     }
-    #loadingMessage {
-      color: #aaa;
-      font-style: italic;
-      padding: 5px 10px;
-      margin-bottom: 10px;
-      display: none;
-    }
-    #countryList {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      margin-bottom: 12px;
-    }
     .country {
-      background: #222;
       padding: 8px;
+      margin: 5px 0;
+      background: #222;
       border-radius: 4px;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 10px;
     }
     .country:hover {
       background: #333;
     }
-    .flag {
-      width: 24px;
-      height: 16px;
-      object-fit: cover;
-    }
     #channels {
       flex-grow: 1;
-      overflow-y: auto;
-      min-height: 0;
       padding: 10px;
+      overflow-y: auto;
     }
     .channel {
       background: #222;
-      padding: 5px;
-      margin: 5px 0;
+      padding: 8px;
+      margin: 6px 0;
       border-radius: 4px;
       cursor: pointer;
     }
     .channel:hover {
       background: #444;
     }
-    #playerModal {
+    #player {
       display: none;
       position: fixed;
       top: 0; left: 0;
-      width: 100vw;
+      width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.9);
+      justify-content: center;
+      align-items: center;
+      z-index: 10;
+    }
+    #player.active {
+      display: flex;
+    }
+    #close {
+      position: absolute;
+      top: 10px; right: 20px;
+      font-size: 2rem;
+      color: white;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="topbar">
+    <input type="text" id="channelSearch" placeholder="Buscar canal o país...">
+  </div>
+  <div id="main">
+    <div id="countries"></div>
+    <div id="channels"></div>
+  </div>
+  <div id="player">
+    <div id="close">&times;</div>
+    <video id="tv" controls autoplay width="800" height="450"></video>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script>
+    const countriesEl = document.getElementById('countries');
+    const channelsEl = document.getElementById('channels');
+    const player = document.getElementById('player');
+    const tv = document.getElementById('tv');
+    const close = document.getElementById('close');
+    const searchInput = document.getElementById('channelSearch');
+
+    let currentChannels = [];
+    let hls;
+
+    const countries = [
+      { code: 'ar', name: 'Argentina' },
+      { code: 'es', name: 'España' },
+      { code: 'us', name: 'Estados Unidos' }
+    ];
+
+    countries.forEach(c => {
+      const div = document.createElement('div');
+      div.className = 'country';
+      div.textContent = c.name;
+      div.onclick = () => loadChannels(c.code, c.name);
+      countriesEl.appendChild(div);
+    });
+
+    async function loadChannels(code, name) {
+      channelsEl.innerHTML = `<p>Cargando canales de ${name}...</p>`;
+      try {
+        const res = await fetch(`https://iptv-org.github.io/iptv/countries/${code}.m3u`);
+        const txt = await res.text();
+        const lines =
