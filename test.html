@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>TV Mundial – Dinámico</title>
   <style>
-    /* CSS completo como antes */
     * { box-sizing: border-box; }
     html, body { margin:0; padding:0; height:100%; background:#000; color:white; font-family:sans-serif; overflow:hidden; }
     #topbar { height:50px; display:flex; justify-content:flex-end; align-items:center; background:#111; padding:0 15px; }
@@ -65,21 +64,27 @@
     let allChannels = [];
     let hlsInstance = null;
 
-    // Carga lista de países
+    // ✅ Cargar lista de países correctamente
     fetch('https://iptv-org.github.io/iptv/index.country.m3u')
       .then(res => res.text())
       .then(txt => {
         const countries = [];
-        txt.split('\n').forEach(line => {
-          const m = line.match(/^[^#].+\s+https:\/\/iptv-org\.github\.io\/iptv\/countries\/([a-z]{2})\.m3u$/i);
-          if (m) {
-            const [_, code] = m;
-            const name = line.replace(/^#EXTINF:-1,(.+),.+/, '$1').trim();
-            countries.push({ code, name });
+        const lines = txt.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].startsWith('#EXTINF')) {
+            const name = lines[i].split(',')[1]?.trim();
+            const url = lines[i + 1];
+            if (name && url) {
+              const match = url.match(/countries\/([a-z]{2})\.m3u$/i);
+              if (match) {
+                const code = match[1].toLowerCase();
+                countries.push({ code, name });
+              }
+            }
           }
-        });
+        }
         countries.sort((a, b) => a.name.localeCompare(b.name));
-        countries.forEach(({code, name}) => {
+        countries.forEach(({ code, name }) => {
           const div = document.createElement('div');
           div.className = 'country';
           div.innerHTML = `<img class="flag" src="https://flagcdn.com/w40/${code}.png" alt="${name}"> <span>${name}</span>`;
@@ -89,7 +94,7 @@
       })
       .catch(console.error);
 
-    // Cargar canales al hacer clic
+    // ✅ Cargar canales por país
     async function loadCountryChannels(code, name) {
       if (code === currentCountryCode) {
         currentCountryCode = null;
@@ -114,8 +119,8 @@
         for (let i = 0; i < lines.length; i++) {
           if (lines[i].startsWith('#EXTINF')) {
             const nameCh = lines[i].split(',')[1] || 'Sin nombre';
-            const url = lines[i+1];
-            if (url) allChannels.push({name: nameCh, country: name});
+            const url = lines[i + 1];
+            if (url) allChannels.push({ name: nameCh, url, country: name });
           }
         }
       } catch {
@@ -126,7 +131,7 @@
       renderChannels(allChannels);
     }
 
-    // Mostrar canales
+    // ✅ Renderizar canales
     function renderChannels(list) {
       channelsDiv.innerHTML = '';
       list.forEach(ch => {
@@ -138,7 +143,7 @@
       });
     }
 
-    // Reproductor HLS
+    // ✅ Reproducir canal
     function playChannel(url) {
       if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
       if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
@@ -152,7 +157,7 @@
       videoPlayer.play().catch(() => {});
     }
 
-    // Buscador
+    // ✅ Buscar canal
     searchInput.addEventListener('input', () => {
       const val = searchInput.value;
       clearSearch.style.display = val ? 'block' : 'none';
@@ -163,6 +168,7 @@
         c.country.toLowerCase().includes(filter)
       ));
     });
+
     clearSearch.onclick = () => {
       searchInput.value = '';
       clearSearch.style.display = 'none';
