@@ -250,22 +250,38 @@
     }
 
     function playChannel(url) {
-      // Reproduce en el preview
-      previewPlayer.src = url;
-      previewPlayer.play().catch(() => {});
+      // Reproducir en el preview
+      if (previewPlayer.hls) {
+        previewPlayer.hls.destroy();
+        previewPlayer.hls = null;
+      }
+      if (Hls.isSupported() && url.endsWith('.m3u8')) {
+        const hlsPreview = new Hls();
+        hlsPreview.loadSource(url);
+        hlsPreview.attachMedia(previewPlayer);
+        hlsPreview.on(Hls.Events.MANIFEST_PARSED, () => previewPlayer.play());
+        previewPlayer.hls = hlsPreview;
+      } else {
+        previewPlayer.src = url;
+        previewPlayer.play().catch(() => {});
+      }
 
-      // Al hacer click en preview, abre el reproductor grande
+      // Al hacer click en preview, abrir reproductor grande
       previewPlayer.onclick = () => {
-        if (hls) { hls.destroy(); hls = null; }
-        if (Hls.isSupported()) {
+        if (hls) {
+          hls.destroy();
+          hls = null;
+        }
+        if (Hls.isSupported() && url.endsWith('.m3u8')) {
           hls = new Hls();
           hls.loadSource(url);
           hls.attachMedia(tv);
+          hls.on(Hls.Events.MANIFEST_PARSED, () => tv.play());
         } else {
           tv.src = url;
+          tv.play().catch(() => {});
         }
         player.classList.add('active');
-        tv.play().catch(() => {});
       };
     }
 
