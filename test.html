@@ -121,4 +121,59 @@
       try {
         const res = await fetch(`https://iptv-org.github.io/iptv/countries/${code}.m3u`);
         const txt = await res.text();
-        const lines =
+        const lines = txt.split('\n');
+        const list = [];
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].startsWith('#EXTINF')) {
+            const chName = lines[i].split(',')[1] || 'Sin nombre';
+            const url = lines[i + 1];
+            if (url) list.push({ name: chName, url, country: name });
+            i++;
+          }
+        }
+        currentChannels = list;
+        renderChannels(list);
+      } catch (e) {
+        channelsEl.innerHTML = `<p>Error al cargar canales.</p>`;
+      }
+    }
+
+    function renderChannels(list) {
+      channelsEl.innerHTML = '';
+      list.forEach(ch => {
+        const div = document.createElement('div');
+        div.className = 'channel';
+        div.textContent = `${ch.name} (${ch.country})`;
+        div.onclick = () => playChannel(ch.url);
+        channelsEl.appendChild(div);
+      });
+    }
+
+    function playChannel(url) {
+      if (hls) { hls.destroy(); hls = null; }
+      if (Hls.isSupported()) {
+        hls = new Hls();
+        hls.loadSource(url);
+        hls.attachMedia(tv);
+      } else {
+        tv.src = url;
+      }
+      player.classList.add('active');
+      tv.play().catch(() => {});
+    }
+
+    close.onclick = () => {
+      player.classList.remove('active');
+      tv.pause();
+    };
+
+    searchInput.addEventListener('input', () => {
+      const val = searchInput.value.toLowerCase();
+      const filtered = currentChannels.filter(c =>
+        c.name.toLowerCase().includes(val) || c.country.toLowerCase().includes(val)
+      );
+      renderChannels(filtered);
+    });
+  </script>
+</body>
+</html>
