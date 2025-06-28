@@ -65,34 +65,42 @@
     let hlsInstance = null;
 
     // ✅ Cargar lista de países correctamente
-    fetch('https://iptv-org.github.io/iptv/index.country.m3u')
-      .then(res => res.text())
-      .then(txt => {
-        const countries = [];
-        const lines = txt.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-          if (lines[i].startsWith('#EXTINF')) {
-            const name = lines[i].split(',')[1]?.trim();
-            const url = lines[i + 1];
-            if (name && url) {
-              const match = url.match(/countries\/([a-z]{2})\.m3u$/i);
-              if (match) {
-                const code = match[1].toLowerCase();
-                countries.push({ code, name });
-              }
-            }
-          }
+   fetch('https://iptv-org.github.io/iptv/index.country.m3u')
+  .then(res => res.text())
+  .then(txt => {
+    const countries = [];
+    const lines = txt.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line.startsWith('#EXTINF')) {
+        const name = line.split(',')[1]?.trim();
+        const url = lines[i + 1]?.trim();
+        const match = url?.match(/countries\/([a-z]{2})\.m3u$/i);
+        if (name && match) {
+          countries.push({ name, code: match[1].toLowerCase() });
         }
-        countries.sort((a, b) => a.name.localeCompare(b.name));
-        countries.forEach(({ code, name }) => {
-          const div = document.createElement('div');
-          div.className = 'country';
-          div.innerHTML = `<img class="flag" src="https://flagcdn.com/w40/${code}.png" alt="${name}"> <span>${name}</span>`;
-          div.onclick = () => loadCountryChannels(code, name);
-          countryListEl.appendChild(div);
-        });
-      })
-      .catch(console.error);
+      }
+    }
+
+    if (countries.length === 0) {
+      countryListEl.innerHTML = '<p>No se encontraron países. Verifica la fuente.</p>';
+      return;
+    }
+
+    countries.sort((a, b) => a.name.localeCompare(b.name));
+
+    countries.forEach(({ code, name }) => {
+      const div = document.createElement('div');
+      div.className = 'country';
+      div.innerHTML = `<img class="flag" src="https://flagcdn.com/w40/${code}.png" alt="${name}"> <span>${name}</span>`;
+      div.onclick = () => loadCountryChannels(code, name);
+      countryListEl.appendChild(div);
+    });
+  })
+  .catch(err => {
+    console.error('Error cargando la lista de países:', err);
+    countryListEl.innerHTML = '<p>Error al cargar países.</p>';
+  });
 
     // ✅ Cargar canales por país
     async function loadCountryChannels(code, name) {
