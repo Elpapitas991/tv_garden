@@ -3,77 +3,138 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>TV Mundial (Test)</title>
+  <title>TV Mundial</title>
   <style>
     body {
-      margin: 0; padding: 0;
+      margin: 0;
       font-family: sans-serif;
-      background: #000; color: white;
+      background: #000;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
     }
+
     #topbar {
       background: #111;
       padding: 10px;
-      text-align: right;
+      display: flex;
+      justify-content: flex-end;
     }
+
     #channelSearch {
       padding: 6px;
       font-size: 16px;
-      width: 250px;
+      width: 100%;
+      max-width: 300px;
     }
+
     #main {
       display: flex;
-      height: calc(100vh - 50px);
+      flex: 1;
+      overflow: hidden;
     }
+
     #countries {
       width: 250px;
       background: #111;
       padding: 10px;
       overflow-y: auto;
     }
-    .country {
-      padding: 8px;
-      margin: 5px 0;
-      background: #222;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    .country:hover {
-      background: #333;
-    }
+
     #channels {
       flex-grow: 1;
       padding: 10px;
       overflow-y: auto;
     }
-    .channel {
+
+    .country {
       background: #222;
       padding: 8px;
-      margin: 6px 0;
+      margin-bottom: 6px;
       border-radius: 4px;
       cursor: pointer;
     }
+
+    .country:hover {
+      background: #333;
+    }
+
+    .channel {
+      background: #222;
+      padding: 8px;
+      margin-bottom: 6px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
     .channel:hover {
       background: #444;
     }
+
     #player {
       display: none;
       position: fixed;
       top: 0; left: 0;
       width: 100vw; height: 100vh;
-      background: rgba(0,0,0,0.9);
+      background: rgba(0, 0, 0, 0.9);
       justify-content: center;
       align-items: center;
       z-index: 10;
     }
+
     #player.active {
       display: flex;
     }
+
     #close {
       position: absolute;
-      top: 10px; right: 20px;
+      top: 10px;
+      right: 20px;
       font-size: 2rem;
       color: white;
       cursor: pointer;
+    }
+
+    video {
+      max-width: 90%;
+      max-height: 90%;
+    }
+
+    /* Responsive para móviles */
+    @media (max-width: 768px) {
+      #main {
+        flex-direction: column;
+      }
+
+      #countries {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        overflow-y: auto;
+        max-height: 150px;
+      }
+
+      .country {
+        flex: 1 0 calc(50% - 10px);
+        text-align: center;
+      }
+
+      #channels {
+        flex-grow: 1;
+        padding: 10px;
+        overflow-y: auto;
+      }
+
+      #topbar {
+        flex-direction: column;
+        align-items: flex-end;
+      }
+
+      #channelSearch {
+        width: 100%;
+      }
     }
   </style>
 </head>
@@ -81,13 +142,15 @@
   <div id="topbar">
     <input type="text" id="channelSearch" placeholder="Buscar canal o país...">
   </div>
+
   <div id="main">
     <div id="countries"></div>
     <div id="channels"></div>
   </div>
+
   <div id="player">
     <div id="close">&times;</div>
-    <video id="tv" controls autoplay width="800" height="450"></video>
+    <video id="tv" controls autoplay></video>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
@@ -99,7 +162,9 @@
     const close = document.getElementById('close');
     const searchInput = document.getElementById('channelSearch');
 
-    let currentChannels = [];
+    let currentCountryCode = null;
+    let allChannels = [];
+    let visibleChannels = [];
     let hls;
 
     const countries = [
@@ -112,29 +177,47 @@
       const div = document.createElement('div');
       div.className = 'country';
       div.textContent = c.name;
-      div.onclick = () => loadChannels(c.code, c.name);
+      div.onclick = () => toggleCountry(c.code, c.name);
       countriesEl.appendChild(div);
     });
 
-    async function loadChannels(code, name) {
+    async function toggleCountry(code, name) {
+      if (code === currentCountryCode) {
+        currentCountryCode = null;
+        visibleChannels = [];
+        renderChannels([]);
+        return;
+      }
+
+      currentCountryCode = code;
+      const alreadyLoaded = allChannels.some(c => c.code === code);
+      if (alreadyLoaded) {
+        visibleChannels = allChannels.filter(c => c.code === code);
+        renderChannels(visibleChannels);
+        return;
+      }
+
       channelsEl.innerHTML = `<p>Cargando canales de ${name}...</p>`;
       try {
         const res = await fetch(`https://iptv-org.github.io/iptv/countries/${code}.m3u`);
         const txt = await res.text();
         const lines = txt.split('\n');
         const list = [];
+
         for (let i = 0; i < lines.length; i++) {
           if (lines[i].startsWith('#EXTINF')) {
             const chName = lines[i].split(',')[1] || 'Sin nombre';
             const url = lines[i + 1];
-            if (url) list.push({ name: chName, url, country: name });
+            if (url) list.push({ name: chName, url, country: name, code });
             i++;
           }
         }
-        currentChannels = list;
+
+        allChannels.push(...list);
+        visibleChannels = list;
         renderChannels(list);
       } catch (e) {
-        channelsEl.innerHTML = `<p>Error al cargar canales.</p>`;
+        channelsEl.innerHTML = `<p>Error al cargar canales de ${name}</p>`;
       }
     }
 
@@ -168,9 +251,14 @@
     };
 
     searchInput.addEventListener('input', () => {
-      const val = searchInput.value.toLowerCase();
-      const filtered = currentChannels.filter(c =>
-        c.name.toLowerCase().includes(val) || c.country.toLowerCase().includes(val)
+      const val = searchInput.value.toLowerCase().trim();
+      if (!val) {
+        renderChannels(visibleChannels);
+        return;
+      }
+
+      const filtered = allChannels.filter(ch =>
+        ch.name.toLowerCase().includes(val) || ch.country.toLowerCase().includes(val)
       );
       renderChannels(filtered);
     });
